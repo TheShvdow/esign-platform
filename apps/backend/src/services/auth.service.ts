@@ -1,4 +1,5 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+// src/services/auth.service.ts
+import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -20,7 +21,7 @@ export class AuthService {
 
     const user = await this.userRepository.findOne({
       where: { email },
-      select: ['id', 'email', 'passwordHash', 'role', 'isActive'],
+      select: ['id', 'email', 'passwordHash', 'firstName', 'lastName', 'role', 'isActive', 'emailVerified', 'mfaEnabled', 'createdAt'],
     });
 
     if (!user || !user.isActive) {
@@ -31,6 +32,11 @@ export class AuthService {
     if (!isPasswordValid) {
       throw new UnauthorizedException('Invalid credentials');
     }
+
+    // Mise à jour du dernier login
+    await this.userRepository.update(user.id, { 
+      lastLoginAt: new Date() 
+    });
 
     const payload = { sub: user.id, email: user.email, role: user.role };
     const accessToken = this.jwtService.sign(payload);
@@ -43,13 +49,13 @@ export class AuthService {
       user: {
         id: user.id,
         email: user.email,
-        firstName: '',
-        lastName: '',
+        firstName: user.firstName,
+        lastName: user.lastName,
         role: user.role,
         isActive: user.isActive,
-        emailVerified: false,
-        mfaEnabled: false,
-        createdAt: new Date(),
+        emailVerified: user.emailVerified,
+        mfaEnabled: user.mfaEnabled,
+        createdAt: user.createdAt,
       },
     };
   }
@@ -57,21 +63,25 @@ export class AuthService {
   async register(registerDto: RegisterDto): Promise<AuthResponseDto> {
     const { email, password, firstName, lastName, role } = registerDto;
 
+    // Vérifier si l'utilisateur existe déjà
     const existingUser = await this.userRepository.findOne({
       where: { email },
     });
+    
     if (existingUser) {
-      throw new UnauthorizedException('User already exists');
+      throw new ConflictException('User with this email already exists');
     }
 
+    // Hasher le mot de passe
     const passwordHash = await bcrypt.hash(password, 12);
 
+    // Créer l'utilisateur
     const user = this.userRepository.create({
       email,
       firstName,
       lastName,
       passwordHash,
-      role: role || UserRole.USER,
+      role: role || UserRole.USER, // ✅ Utiliser USER par défaut si non spécifié
       isActive: true,
       emailVerified: false,
       mfaEnabled: false,
@@ -79,6 +89,7 @@ export class AuthService {
 
     const savedUser = await this.userRepository.save(user);
 
+    // Générer les tokens
     const payload = {
       sub: savedUser.id,
       email: savedUser.email,
@@ -106,7 +117,7 @@ export class AuthService {
   }
 
   async logout(userId: string): Promise<void> {
-    // Implementer la logique de logout (blacklist tokens, etc.)
+    // Implémenter la logique de logout (blacklist tokens, etc.)
     console.log(`User ${userId} logged out`);
   }
 

@@ -8,23 +8,27 @@ config();
 
 const configService = new ConfigService();
 
+// ✅ Import direct des entités pour éviter les problèmes de path
+import { User } from '../entities/user.entity';
+import { Document } from '../entities/document.entity';
+import { Signature } from '../entities/signature.entity';
+import { AuditLog } from '../entities/audit-log.entity';
+
 export const AppDataSource = new DataSource({
   type: 'postgres',
   host: configService.get('DATABASE_HOST'),
-  port: configService.get('DATABASE_PORT', 5432),
+  port: parseInt(configService.get('DATABASE_PORT', '5432')),
   username: configService.get('DATABASE_USERNAME'),
   password: configService.get('DATABASE_PASSWORD'),
   database: configService.get('DATABASE_NAME'),
   
-  // SSL Configuration pour Neon (requis)
+  // SSL Configuration pour Neon
   ssl: {
     rejectUnauthorized: false,
   },
   
-  // Entités
-  entities: [
-    __dirname + '/../entities/*.entity{.ts,.js}',
-  ],
+  // ✅ Entités directement importées au lieu de patterns de fichiers
+  entities: [User, Document, Signature, AuditLog],
   
   // Migrations
   migrations: [
@@ -35,54 +39,16 @@ export const AppDataSource = new DataSource({
   migrationsTableName: 'migrations',
   migrationsRun: false,
   
-  // Synchronisation TEMPORAIRE - pour créer le schéma initial
-  synchronize: true, // TEMPORAIRE - passer à false après création
+  // ✅ Synchronisation DÉSACTIVÉE - utiliser uniquement les migrations
+  synchronize: false,
   
-  // Logging
+  // Logging pour debug
   logging: configService.get('NODE_ENV') === 'development' ? ['query', 'error'] : ['error'],
   
-  // Autres options
-  dropSchema: false,
-  cache: {
-    duration: 30000,
-  },
-  
-  // Pool de connexions pour Neon
+  // Options pour Neon
   extra: {
     connectionLimit: 10,
     acquireTimeout: 60000,
     timeout: 60000,
   },
 });
-
-// Configuration pour NestJS
-export const typeOrmConfig = {
-  type: 'postgres' as const,
-  host: configService.get('DATABASE_HOST'),
-  port: configService.get('DATABASE_PORT', 5432),
-  username: configService.get('DATABASE_USERNAME'),
-  password: configService.get('DATABASE_PASSWORD'),
-  database: configService.get('DATABASE_NAME'),
-  
-  ssl: {
-    rejectUnauthorized: false,
-  },
-  
-  entities: [__dirname + '/../entities/*.entity{.ts,.js}'],
-  migrations: [__dirname + '/../migrations/*{.ts,.js}'],
-  
-  synchronize: true, // TEMPORAIRE
-  logging: configService.get('NODE_ENV') === 'development',
-  
-  // Options de pool pour Neon
-  extra: {
-    connectionLimit: 10,
-    acquireTimeout: 60000,
-    timeout: 60000,
-  },
-  
-  // Cache
-  cache: {
-    duration: 30000,
-  },
-};

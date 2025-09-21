@@ -1,3 +1,4 @@
+// src/app.module.ts
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -9,11 +10,10 @@ import { PassportModule } from '@nestjs/passport';
 // Configuration
 import configuration from './config/configuration';
 
-// Entities
+// Entities - ✅ Import direct sans Certificate pour éviter les erreurs
 import { User } from './entities/user.entity';
 import { Document } from './entities/document.entity';
 import { Signature } from './entities/signature.entity';
-import { Certificate } from './entities/certificate.entity';
 import { AuditLog } from './entities/audit-log.entity';
 
 // Controllers
@@ -41,20 +41,37 @@ import { JwtStrategy } from './strategies/jwt.strategy';
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         type: 'postgres',
-        host: configService.get('DATABASE_HOST') || 'localhost',
-        port: configService.get('DATABASE_PORT') || 5432,
-        username: configService.get('DATABASE_USERNAME') || 'postgres',
-        password: configService.get('DATABASE_PASSWORD') || 'password',
-        database: configService.get('DATABASE_NAME') || 'esign',
-        entities: [User, Document, Signature, Certificate, AuditLog],
-        //synchronize: configService.get('NODE_ENV') === 'development',
+        // ✅ Utilisation des mêmes variables que data-source.ts
+        host: configService.get('DATABASE_HOST'),
+        port: parseInt(configService.get('DATABASE_PORT', '5432')),
+        username: configService.get('DATABASE_USERNAME'),
+        password: configService.get('DATABASE_PASSWORD'),
+        database: configService.get('DATABASE_NAME'),
+        
+        // ✅ Entités explicites - sans Certificate pour éviter les erreurs
+        entities: [User, Document, Signature, AuditLog],
+        
+        // ✅ Synchronisation désactivée - utiliser UNIQUEMENT les migrations
+        synchronize: false,
+        
         ssl: {
-    rejectUnauthorized: false,
-  },
+          rejectUnauthorized: false,
+        },
+        
         logging: configService.get('NODE_ENV') === 'development',
+        
+        // Pool de connexions pour Neon
+        extra: {
+          connectionLimit: 10,
+          acquireTimeout: 60000,
+          timeout: 60000,
+        },
       })
     }),
-    TypeOrmModule.forFeature([User, Document, Signature, Certificate, AuditLog]),
+    
+    // ✅ Repository features - sans Certificate
+    TypeOrmModule.forFeature([User, Document, Signature, AuditLog]),
+    
     PassportModule,
     JwtModule.registerAsync({
       inject: [ConfigService],

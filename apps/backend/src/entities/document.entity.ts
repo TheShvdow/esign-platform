@@ -44,7 +44,6 @@ export class Document {
   storageKey: string;
 
   @Column({ name: 'file_hash', length: 128 })
-  @Index()
   fileHash: string;
 
   @Column({ name: 'hash_algorithm', length: 50, default: 'sha256' })
