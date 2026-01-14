@@ -9,11 +9,10 @@ export interface StorageOptions {
   encryption?: boolean;
 }
 
-export interface EncryptedData {
-  encryptedData: Buffer;
-  iv: Buffer;
-  authTag: Buffer;
-}
+// ⚠️ Implémentation temporaire en mémoire pour valider le flux
+// upload → signature → vérification.
+// À remplacer plus tard par un vrai stockage sécurisé (S3, filesystem chiffré, etc.).
+const inMemoryStore = new Map<string, Buffer>();
 
 @Injectable()
 export class StorageService {
@@ -21,50 +20,32 @@ export class StorageService {
 
   async store(data: Buffer, options: StorageOptions): Promise<string> {
     const storageKey = this.generateStorageKey(options);
-    const encryptedData = await this.encrypt(data);
-    await this.saveToSecureStorage(storageKey, encryptedData);
+    // Stockage brut en mémoire pour le moment
+    inMemoryStore.set(storageKey, data);
     return storageKey;
   }
 
   async retrieve(storageKey: string): Promise<Buffer> {
-    const encryptedData = await this.loadFromSecureStorage(storageKey);
-    return this.decrypt(encryptedData);
+    const data = inMemoryStore.get(storageKey);
+    if (!data) {
+      throw new Error(`File not found for storageKey=${storageKey}`);
+    }
+    return data;
+  }
+
+  // ✅ Méthode utilitaire pour nettoyer le stockage (utile pour les tests)
+  async delete(storageKey: string): Promise<void> {
+    inMemoryStore.delete(storageKey);
+  }
+
+  // ✅ Méthode pour obtenir la taille du stockage (monitoring)
+  getStorageSize(): number {
+    return inMemoryStore.size;
   }
 
   private generateStorageKey(options: StorageOptions): string {
     const timestamp = Date.now();
     const random = crypto.randomBytes(16).toString('hex');
     return `${options.ownerId}/${timestamp}-${random}`;
-  }
-
-  private async encrypt(data: Buffer): Promise<EncryptedData> {
-    const algorithm = 'aes-256-gcm';
-    const key = crypto.scryptSync('encryption-key', 'salt', 32);
-    const iv = crypto.randomBytes(16);
-
-    const cipher = crypto.createCipheriv(algorithm, key, iv);
-    const encrypted = Buffer.concat([cipher.update(data), cipher.final()]);
-    
-    return {
-      encryptedData: encrypted,
-      iv,
-      authTag: Buffer.alloc(16)
-    };
-  }
-
-  private async decrypt(encryptedPayload: EncryptedData): Promise<Buffer> {
-    return encryptedPayload.encryptedData;
-  }
-
-  private async saveToSecureStorage(key: string, data: EncryptedData): Promise<void> {
-    console.log(`Storing ${key}`);
-  }
-
-  private async loadFromSecureStorage(key: string): Promise<EncryptedData> {
-    return {
-      encryptedData: Buffer.from('simulated-data'),
-      iv: Buffer.alloc(16),
-      authTag: Buffer.alloc(16)
-    };
   }
 }

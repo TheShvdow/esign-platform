@@ -3,10 +3,9 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
-  ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { Document } from '../entities/document.entity';
 import { User } from '../entities/user.entity';
 import {
@@ -14,23 +13,30 @@ import {
   DocumentDto,
   SignDocumentDto,
 } from '../dto/document.dto';
-import { DocumentStatus, UserRole, AuditAction } from '../types/global.types';
-import { CryptographyService } from './cryptography.service';
+import { DocumentStatus, UserRole, AuditAction, AuthenticatedRequest, DocumentVerificationResult } from '../types/global.types';
+import { CryptographyService, SignatureResult } from './cryptography.service';
 import { StorageService } from './storage.service';
 import { AuditService } from './audit.service';
-import { NotificationService } from './notification.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { FileValidationService } from './file-validation.service';
+import { DocumentMapperService } from './document-mapper.service';
+import { PermissionService } from './permission.service';
+import { SignatureCreationService } from './signature-creation.service';
 
 @Injectable()
 export class DocumentService {
   constructor(
     @InjectRepository(Document)
     private documentRepository: Repository<Document>,
+    private dataSource: DataSource,
     private cryptographyService: CryptographyService,
     private storageService: StorageService,
     private auditService: AuditService,
-    private notificationService: NotificationService,
     private eventEmitter: EventEmitter2,
+    private fileValidationService: FileValidationService,
+    private documentMapper: DocumentMapperService,
+    private permissionService: PermissionService,
+    private signatureCreationService: SignatureCreationService,
   ) {}
 
   async create(
@@ -38,20 +44,15 @@ export class DocumentService {
     file: Express.Multer.File,
     user: User,
   ): Promise<DocumentDto> {
-    // Validation du fichier
-    this.validateFile(file);
+    this.fileValidationService.validate(file);
 
-    // Calcul du hash du fichier
     const fileHash = await this.cryptographyService.generateHash(file.buffer);
-
-    // Stockage sécurisé du fichier
     const storageKey = await this.storageService.store(file.buffer, {
       fileName: file.originalname,
       mimeType: file.mimetype,
       ownerId: user.id,
     });
 
-    // Création de l'entité document
     const document = this.documentRepository.create({
       ...createDocumentDto,
       fileName: `${Date.now()}-${file.originalname}`,
@@ -67,7 +68,6 @@ export class DocumentService {
 
     const savedDocument = await this.documentRepository.save(document);
 
-    // Audit log
     await this.auditService.log({
       action: AuditAction.DOCUMENT_UPLOAD,
       userId: user.id,
@@ -80,13 +80,12 @@ export class DocumentService {
       },
     });
 
-    // Événement pour notifications
     this.eventEmitter.emit('document.created', {
       document: savedDocument,
       user,
     });
 
-    return this.toDto(savedDocument);
+    return this.documentMapper.toDto(savedDocument);
   }
 
   async findAll(
@@ -105,7 +104,6 @@ export class DocumentService {
       .leftJoinAndSelect('document.signatures', 'signatures')
       .leftJoinAndSelect('signatures.signer', 'signer');
 
-    // Filtrage selon le rôle
     if (!user.hasRole(UserRole.ADMIN)) {
       query.where('document.ownerId = :userId', { userId: user.id });
     }
@@ -117,7 +115,7 @@ export class DocumentService {
       .getManyAndCount();
 
     return {
-      documents: documents.map((doc) => this.toDto(doc)),
+      documents: this.documentMapper.toDtoList(documents),
       total,
       page,
       limit,
@@ -134,54 +132,23 @@ export class DocumentService {
       throw new NotFoundException('Document not found');
     }
 
-    // Vérification des permissions
-    this.checkPermissions(document, user);
-
-    return this.toDto(document);
+    this.permissionService.checkDocumentAccess(document, user);
+    return this.documentMapper.toDto(document);
   }
 
   async signDocument(
     documentId: string,
     signDto: SignDocumentDto,
     user: User,
-    request: any,
+    request: AuthenticatedRequest,
   ): Promise<DocumentDto> {
-    const document = await this.documentRepository.findOne({
-      where: { id: documentId },
-      relations: ['signatures'],
-    });
+    const document = await this.loadDocumentForSigning(documentId);
+    this.validateDocumentForSigning(document, user);
 
-    if (!document) {
-      throw new NotFoundException('Document not found');
-    }
+    const fileBuffer = await this.retrieveFile(document.storageKey, documentId);
+    const signatureResult = await this.createSignature(fileBuffer, signDto);
 
-    // Vérifications préalables avec les méthodes de l'entité
-    if (!document.canBeSignedBy(user.id)) {
-      throw new BadRequestException('Document cannot be signed by this user');
-    }
-
-    if (document.isExpired()) {
-      throw new BadRequestException('Document has expired');
-    }
-
-    // Vérifications supplémentaires avec les méthodes de l'entité
-    const validationErrors = document.validateForSigning();
-    if (validationErrors.length > 0) {
-      throw new BadRequestException(`Cannot sign document: ${validationErrors.join(', ')}`);
-    }
-
-    // Récupération du fichier depuis le stockage
-    const fileBuffer = await this.storageService.retrieve(document.storageKey);
-
-    // Signature cryptographique
-    const signatureResult = await this.cryptographyService.signData({
-      data: fileBuffer,
-      certificateId: signDto.certificateId,
-      signatureType: signDto.signatureType,
-    });
-
-    // Création de la signature en base
-    const signature = await this.createSignatureRecord(
+    const updatedDocument = await this.saveSignatureInTransaction(
       document,
       user,
       signDto,
@@ -189,44 +156,16 @@ export class DocumentService {
       request,
     );
 
-    // Mise à jour du statut du document avec les méthodes de l'entité
-    document.updateStatusBasedOnSignatures();
-    await this.documentRepository.save(document);
+    await this.logSignatureAudit(updatedDocument, user, signDto);
+    this.emitSignatureEvent(updatedDocument, user);
 
-    // Audit log
-    await this.auditService.log({
-      action: AuditAction.DOCUMENT_SIGN,
-      userId: user.id,
-      entityType: 'Document',
-      entityId: document.id,
-      details: {
-        signatureType: signDto.signatureType,
-        certificateId: signDto.certificateId,
-        signatureProgress: document.getSignatureProgress(),
-      },
-    });
-
-    // Notifications
-    this.eventEmitter.emit('document.signed', {
-      document,
-      signature,
-      user,
-    });
-
-    return this.findById(documentId, user);
+    return this.documentMapper.toDto(updatedDocument);
   }
 
   async verifyDocument(
     documentId: string,
     user: User,
-  ): Promise<{
-    isValid: boolean;
-    signatures: Array<{
-      signatureId: string;
-      isValid: boolean;
-      errors?: string[];
-    }>;
-  }> {
+  ): Promise<DocumentVerificationResult> {
     const document = await this.documentRepository.findOne({
       where: { id: documentId },
       relations: ['signatures'],
@@ -236,40 +175,22 @@ export class DocumentService {
       throw new NotFoundException('Document not found');
     }
 
-    this.checkPermissions(document, user);
+    this.permissionService.checkDocumentAccess(document, user);
 
-    // Récupération du fichier original
-    const originalFile = await this.storageService.retrieve(
-      document.storageKey,
-    );
+    const originalFile = await this.retrieveFile(document.storageKey, documentId);
+    this.verifyFileIntegrity(originalFile, document);
 
-    // Vérification de l'intégrité du fichier
-    const currentHash =
-      await this.cryptographyService.generateHash(originalFile);
-    if (currentHash !== document.fileHash) {
-      throw new BadRequestException('Document integrity compromised');
+    if (!document.signatures || document.signatures.length === 0) {
+      return { isValid: false, signatures: [] };
     }
 
-    // Vérification de chaque signature
-    const signatureVerifications = await Promise.all(
-      document.signatures.map(async (signature) => {
-        const verification = await this.cryptographyService.verifySignature(
-          signature.signatureValue,
-          originalFile,
-          signature.certificatePem,
-        );
-
-        return {
-          signatureId: signature.id,
-          isValid: verification.isValid,
-          errors: verification.errors,
-        };
-      }),
+    const signatureVerifications = await this.verifyAllSignatures(
+      document.signatures,
+      originalFile,
     );
 
     const isValid = signatureVerifications.every((v) => v.isValid);
 
-    // Audit log
     await this.auditService.log({
       action: AuditAction.DOCUMENT_VERIFY,
       userId: user.id,
@@ -282,106 +203,155 @@ export class DocumentService {
       },
     });
 
-    return {
-      isValid,
-      signatures: signatureVerifications,
-    };
+    return { isValid, signatures: signatureVerifications };
   }
 
-  private validateFile(file: Express.Multer.File): void {
-    const allowedMimeTypes = [
-      'application/pdf',
-      'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'text/plain',
-    ];
+  private async loadDocumentForSigning(documentId: string): Promise<Document> {
+    const document = await this.documentRepository.findOne({
+      where: { id: documentId },
+      relations: ['signatures', 'signatures.signer'],
+    });
 
-    if (!allowedMimeTypes.includes(file.mimetype)) {
-      throw new BadRequestException('File type not allowed');
+    if (!document) {
+      throw new NotFoundException('Document not found');
     }
 
-    const maxSize = 10 * 1024 * 1024; // 10MB
-    if (file.size > maxSize) {
-      throw new BadRequestException('File size exceeds limit');
+    return document;
+  }
+
+  private validateDocumentForSigning(document: Document, user: User): void {
+    if (!document.canBeSignedBy(user.id)) {
+      throw new BadRequestException('Document cannot be signed by this user');
+    }
+
+    if (document.isExpired()) {
+      throw new BadRequestException('Document has expired');
+    }
+
+    const validationErrors = document.validateForSigning();
+    if (validationErrors.length > 0) {
+      throw new BadRequestException(`Cannot sign document: ${validationErrors.join(', ')}`);
     }
   }
 
-  private checkPermissions(document: Document, user: User): void {
-    if (document.ownerId !== user.id && !user.hasRole(UserRole.ADMIN)) {
-      throw new ForbiddenException('Access denied');
+  private async retrieveFile(storageKey: string, documentId: string): Promise<Buffer> {
+    try {
+      return await this.storageService.retrieve(storageKey);
+    } catch (error) {
+      throw new NotFoundException(`File not found for document ${documentId}: ${error.message}`);
     }
   }
 
-  private async createSignatureRecord(
+  private async createSignature(
+    fileBuffer: Buffer,
+    signDto: SignDocumentDto,
+  ): Promise<SignatureResult> {
+    try {
+      return await this.cryptographyService.signData({
+        data: fileBuffer,
+        certificateId: signDto.certificateId,
+        signatureType: signDto.signatureType,
+      });
+    } catch (error) {
+      throw new BadRequestException(`Failed to sign document: ${error.message}`);
+    }
+  }
+
+  private async saveSignatureInTransaction(
     document: Document,
     user: User,
     signDto: SignDocumentDto,
-    signatureResult: any,
-    request: any,
-  ) {
-    // Implémentation création signature en base - à compléter selon votre entité Signature
-    const signature = {
-      documentId: document.id,
-      signerId: user.id,
-      signatureType: signDto.signatureType,
-      certificateId: signDto.certificateId,
-      signatureValue: signatureResult.signature,
-      evidence: signatureResult.evidence,
-      ipAddress: request.ip,
-      userAgent: request.headers['user-agent'],
-      createdAt: new Date(),
-    };
-    
-    // Sauvegarder en base avec votre repository Signature
-    // return await this.signatureRepository.save(signature);
-    
-    return signature; // Retour temporaire pour la compilation
+    signatureResult: SignatureResult,
+    request: AuthenticatedRequest,
+  ): Promise<Document> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      await this.signatureCreationService.createInTransaction(
+        queryRunner,
+        document,
+        user,
+        signDto,
+        signatureResult,
+        request,
+      );
+
+      document.updateStatusBasedOnSignatures();
+      await queryRunner.manager.save(Document, document);
+      await queryRunner.commitTransaction();
+
+      return await this.documentRepository.findOne({
+        where: { id: document.id },
+        relations: ['owner', 'signatures', 'signatures.signer'],
+      });
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw new BadRequestException(`Failed to save signature: ${error.message}`);
+    } finally {
+      await queryRunner.release();
+    }
   }
 
-  private toDto(document: Document): DocumentDto {
-    return {
-      id: document.id,
-      title: document.title,
-      description: document.description,
-      fileName: document.fileName,
-      originalName: document.originalName,
-      mimeType: document.mimeType,
-      fileSize: document.fileSize,
-      fileHash: document.fileHash,
-      status: document.status,
-      expiresAt: document.expiresAt,
-      createdAt: document.createdAt,
-      updatedAt: document.updatedAt,
-      owner: {
-        id: document.owner.id,
-        email: document.owner.email,
-        firstName: document.owner.firstName,
-        lastName: document.owner.lastName,
-        role: document.owner.role,
-        isActive: document.owner.isActive,
-        emailVerified: document.owner.emailVerified,
-        mfaEnabled: document.owner.mfaEnabled,
-        createdAt: document.owner.createdAt,
+  private async verifyFileIntegrity(fileBuffer: Buffer, document: Document): Promise<void> {
+    const currentHash = await this.cryptographyService.generateHash(fileBuffer);
+    if (currentHash !== document.fileHash) {
+      throw new BadRequestException('Document integrity compromised');
+    }
+  }
+
+  private async verifyAllSignatures(
+    signatures: any[],
+    originalFile: Buffer,
+  ): Promise<Array<{ signatureId: string; isValid: boolean; errors?: string[] }>> {
+    return Promise.all(
+      signatures.map(async (signature) => {
+        try {
+          const verification = await this.cryptographyService.verifySignature(
+            signature.signatureValue,
+            originalFile,
+            signature.certificatePem,
+          );
+
+          return {
+            signatureId: signature.id,
+            isValid: verification.isValid,
+            errors: verification.errors,
+          };
+        } catch (error) {
+          return {
+            signatureId: signature.id,
+            isValid: false,
+            errors: [`Verification error: ${error.message}`],
+          };
+        }
+      }),
+    );
+  }
+
+  private async logSignatureAudit(
+    document: Document,
+    user: User,
+    signDto: SignDocumentDto,
+  ): Promise<void> {
+    await this.auditService.log({
+      action: AuditAction.DOCUMENT_SIGN,
+      userId: user.id,
+      entityType: 'Document',
+      entityId: document.id,
+      details: {
+        signatureType: signDto.signatureType,
+        certificateId: signDto.certificateId,
+        signatureProgress: document.getSignatureProgress(),
       },
-      signatures:
-        document.signatures?.map((sig) => ({
-          id: sig.id,
-          type: sig.type,
-          certificateId: sig.certificateId,
-          isValid: sig.isValid,
-          createdAt: sig.createdAt,
-          signer: {
-            id: sig.signer.id,
-            email: sig.signer.email,
-            firstName: sig.signer.firstName,
-            lastName: sig.signer.lastName,
-            role: sig.signer.role,
-            isActive: sig.signer.isActive,
-            emailVerified: sig.signer.emailVerified,
-            mfaEnabled: sig.signer.mfaEnabled,
-            createdAt: sig.signer.createdAt,
-          },
-        })) || [],
-    };
+    });
+  }
+
+  private emitSignatureEvent(document: Document, user: User): void {
+    this.eventEmitter.emit('document.signed', {
+      document,
+      user,
+    });
   }
 }

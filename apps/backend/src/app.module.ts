@@ -27,6 +27,13 @@ import { CryptographyService } from './services/cryptography.service';
 import { StorageService } from './services/storage.service';
 import { AuditService } from './services/audit.service';
 import { NotificationService } from './services/notification.service';
+import { FileValidationService } from './services/file-validation.service';
+import { DocumentMapperService } from './services/document-mapper.service';
+import { PermissionService } from './services/permission.service';
+import { SignatureCreationService } from './services/signature-creation.service';
+import { HSMService } from './services/hsm.service';
+import { CertificateService } from './services/certificate.service';
+import { TSAService } from './services/tsa.service';
 
 // Strategies
 import { JwtStrategy } from './strategies/jwt.strategy';
@@ -94,6 +101,13 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     StorageService,
     AuditService,
     NotificationService,
+    FileValidationService,
+    DocumentMapperService,
+    PermissionService,
+    SignatureCreationService,
+    HSMService,
+    CertificateService,
+    TSAService,
     JwtStrategy
   ]
 })
