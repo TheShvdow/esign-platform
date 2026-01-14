@@ -148,12 +148,31 @@ export class DocumentService {
     const fileBuffer = await this.retrieveFile(document.storageKey, documentId);
     const signatureResult = await this.createSignature(fileBuffer, signDto);
 
+    // ✅ Bug 2 Fix: Vérifier la signature immédiatement après création
+    const certificatePem =
+      (signatureResult.evidence?.certificateChain &&
+        signatureResult.evidence.certificateChain[0]) ||
+      '';
+
+    const verificationResult = await this.cryptographyService.verifySignature(
+      signatureResult.signature,
+      fileBuffer,
+      certificatePem,
+    );
+
+    const isValid = verificationResult.isValid;
+    const validationErrors = verificationResult.errors
+      ? verificationResult.errors.join('; ')
+      : null;
+
     const updatedDocument = await this.saveSignatureInTransaction(
       document,
       user,
       signDto,
       signatureResult,
       request,
+      isValid,
+      validationErrors,
     );
 
     await this.logSignatureAudit(updatedDocument, user, signDto);
@@ -263,6 +282,8 @@ export class DocumentService {
     signDto: SignDocumentDto,
     signatureResult: SignatureResult,
     request: AuthenticatedRequest,
+    isValid: boolean,
+    validationErrors: string | null,
   ): Promise<Document> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -276,6 +297,8 @@ export class DocumentService {
         signDto,
         signatureResult,
         request,
+        isValid, // ✅ Bug 2 Fix: Passer la valeur vérifiée
+        validationErrors, // ✅ Bug 2 Fix: Passer les erreurs de validation
       );
 
       document.updateStatusBasedOnSignatures();
