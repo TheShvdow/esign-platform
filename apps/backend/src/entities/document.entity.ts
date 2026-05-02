@@ -12,7 +12,11 @@ import {
 } from 'typeorm';
 import { User } from './user.entity';
 import { Signature } from './signature.entity';
-import { DocumentStatus } from '../types/global.types';
+import {
+  DocumentMetadata,
+  DocumentStatus,
+  WorkflowStep,
+} from '../types/global.types';
 
 @Entity('documents')
 @Index(['ownerId', 'status'])
@@ -20,86 +24,125 @@ import { DocumentStatus } from '../types/global.types';
 @Index(['createdAt'])
 export class Document {
   @PrimaryGeneratedColumn('uuid')
-  id: string;
+  id!: string;
 
   @Column({ length: 255 })
-  title: string;
+  title!: string;
 
   @Column({ type: 'text', nullable: true })
   description?: string;
 
   @Column({ name: 'file_name', length: 255 })
-  fileName: string;
+  fileName!: string;
 
   @Column({ name: 'original_name', length: 255 })
-  originalName: string;
+  originalName!: string;
 
   @Column({ name: 'mime_type', length: 100 })
-  mimeType: string;
+  mimeType!: string;
 
   @Column({ name: 'file_size', type: 'bigint' })
-  fileSize: number;
+  fileSize!: number;
 
   @Column({ name: 'storage_key', length: 500 })
-  storageKey: string;
+  storageKey!: string;
 
   @Column({ name: 'file_hash', length: 128 })
-  fileHash: string;
+  fileHash!: string;
 
   @Column({ name: 'hash_algorithm', length: 50, default: 'sha256' })
-  hashAlgorithm: string;
+  hashAlgorithm!: string;
 
   @Column({
     type: 'enum',
     enum: DocumentStatus,
     default: DocumentStatus.PENDING_SIGNATURE,
   })
-  status: DocumentStatus;
+  status!: DocumentStatus;
 
   @Column({ name: 'expires_at', type: 'timestamp', nullable: true })
   expiresAt?: Date;
 
   @Column({ type: 'jsonb', nullable: true })
-  metadata?: Record<string, any>;
+  metadata?: DocumentMetadata;
 
   // Relations
   @Column({ name: 'owner_id' })
-  ownerId: string;
+  ownerId!: string;
 
-  @ManyToOne(() => User, (user) => user.documents, { 
+  @ManyToOne(() => User, (user) => user.documents, {
     onDelete: 'CASCADE',
-    eager: false 
+    eager: false
   })
   @JoinColumn({ name: 'owner_id' })
-  owner: User;
+  owner!: User;
 
-  @OneToMany(() => Signature, (signature) => signature.document, { 
+  @OneToMany(() => Signature, (signature) => signature.document, {
     cascade: true,
-    eager: false 
+    eager: false
   })
-  signatures: Signature[];
+  signatures!: Signature[];
 
   // Timestamps
   @CreateDateColumn({ name: 'created_at' })
-  createdAt: Date;
+  createdAt!: Date;
 
   @UpdateDateColumn({ name: 'updated_at' })
-  updatedAt: Date;
+  updatedAt!: Date;
 
   // Méthodes utilitaires
-  canBeSignedBy(userId: string): boolean {
-    // Vérifier si l'utilisateur peut signer ce document
-    if (this.status !== DocumentStatus.PENDING_SIGNATURE && 
-        this.status !== DocumentStatus.PARTIALLY_SIGNED) {
+  getOrderedWorkflow(): WorkflowStep[] {
+    const raw = this.metadata?.workflow;
+    if (!raw?.length) {
+      return [];
+    }
+    return [...raw].sort((a, b) => a.order - b.order);
+  }
+
+  hasUserAlreadySigned(userId: string): boolean {
+    return !!this.signatures?.some((s) => s.signerId === userId);
+  }
+
+  /**
+   * Qui peut signer maintenant : workflow séquentiel (étape / rôle / assigné)
+   * ou mode parallèle (propriétaire + participants).
+   */
+  canBeSignedBy(user: User): boolean {
+    if (
+      this.status !== DocumentStatus.PENDING_SIGNATURE &&
+      this.status !== DocumentStatus.PARTIALLY_SIGNED
+    ) {
       return false;
     }
 
-    // Vérifier si l'utilisateur n'a pas déjà signé
-    const hasAlreadySigned = this.signatures?.some(
-      signature => signature.signerId === userId
-    );
-    
-    return !hasAlreadySigned;
+    if (this.hasUserAlreadySigned(user.id)) {
+      return false;
+    }
+
+    const workflow = this.getOrderedWorkflow();
+    if (workflow.length > 0) {
+      const stepIndex = this.getCurrentSignatureCount();
+      const step = workflow[stepIndex];
+      if (!step) {
+        return false;
+      }
+      if (step.assigneeUserId) {
+        return user.id === step.assigneeUserId;
+      }
+      if (step.allowedRoles?.length) {
+        return step.allowedRoles.includes(user.role);
+      }
+      return false;
+    }
+
+    const participants = this.metadata?.participantUserIds ?? [];
+    const required = this.getRequiredSignatures();
+    if (required > 1 || participants.length > 0) {
+      const eligible = new Set<string>([this.ownerId, ...participants]);
+      return eligible.has(user.id);
+    }
+
+    return user.id === this.ownerId;
   }
 
   isExpired(): boolean {
@@ -108,8 +151,14 @@ export class Document {
   }
 
   getRequiredSignatures(): number {
-    // Récupérer le nombre de signatures requises depuis les métadonnées
-    return this.metadata?.requiredSignatures || 1;
+    const wf = this.getOrderedWorkflow();
+    if (wf.length > 0) {
+      return wf.length;
+    }
+    const requiredSignatures = this.metadata?.requiredSignatures;
+    return typeof requiredSignatures === 'number' && requiredSignatures >= 1
+      ? requiredSignatures
+      : 1;
   }
 
   getCurrentSignatureCount(): number {
@@ -171,6 +220,7 @@ export class Document {
       progress: this.getSignatureProgress(),
       isComplete: this.isFullySigned(),
       canSign: !this.isExpired() && !this.isFullySigned(),
+      workflowStepCount: this.getOrderedWorkflow().length,
     };
   }
 

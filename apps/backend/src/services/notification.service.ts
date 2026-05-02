@@ -1,11 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-
-interface DocumentEvent {
-  document: any;
-  user: any;
-  signature?: any;
-}
+import { DocumentEvent } from '../types/global.types';
 
 @Injectable()
 export class NotificationService {

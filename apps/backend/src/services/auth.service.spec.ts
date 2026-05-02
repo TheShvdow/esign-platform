@@ -10,7 +10,12 @@ import * as bcrypt from 'bcryptjs';
 
 describe('AuthService', () => {
   let service: AuthService;
-  let userRepository: any;
+  let userRepository: {
+    findOne: jest.Mock;
+    create: jest.Mock;
+    save: jest.Mock;
+    update: jest.Mock;
+  };
   let jwtService: JwtService;
 
   const mockUser = {

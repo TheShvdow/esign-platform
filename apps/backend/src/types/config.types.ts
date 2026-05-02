@@ -1,5 +1,15 @@
 // src/types/config.types.ts
 
+export interface HsmCredentials {
+  apiKey: string;
+  apiSecret: string;
+}
+
+export interface TsaCredentials {
+  username: string;
+  password: string;
+}
+
 export interface AppConfig {
   database: {
     host: string;
@@ -25,10 +35,10 @@ export interface AppConfig {
   hsm: {
     provider: string;
     endpoint: string;
-    credentials: Record<string, any>;
+    credentials: HsmCredentials;
   };
   tsa: {
     url: string;
-    credentials?: Record<string, any>;
+    credentials?: TsaCredentials;
   };
 }

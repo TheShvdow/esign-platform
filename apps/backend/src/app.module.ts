@@ -19,6 +19,8 @@ import { AuditLog } from './entities/audit-log.entity';
 // Controllers
 import { AuthController } from './controllers/auth.controller';
 import { DocumentsController } from './controllers/documents.controller';
+import { UsersController } from './controllers/users.controller';
+import { AdminController } from './controllers/admin.controller';
 
 // Services
 import { AuthService } from './services/auth.service';
@@ -34,6 +36,10 @@ import { SignatureCreationService } from './services/signature-creation.service'
 import { HSMService } from './services/hsm.service';
 import { CertificateService } from './services/certificate.service';
 import { TSAService } from './services/tsa.service';
+import { SignedPdfAnnexService } from './services/signed-pdf-annex.service';
+import { UsersService } from './services/users.service';
+import { AdminService } from './services/admin.service';
+import { RolesGuard } from './guards/roles.guard';
 
 // Strategies
 import { JwtStrategy } from './strategies/jwt.strategy';
@@ -93,7 +99,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
       limit: 100,
     }])
   ],
-  controllers: [AuthController, DocumentsController],
+  controllers: [AuthController, DocumentsController, UsersController, AdminController],
   providers: [
     AuthService,
     DocumentService,
@@ -108,6 +114,10 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     HSMService,
     CertificateService,
     TSAService,
+    SignedPdfAnnexService,
+    UsersService,
+    AdminService,
+    RolesGuard,
     JwtStrategy
   ]
 })

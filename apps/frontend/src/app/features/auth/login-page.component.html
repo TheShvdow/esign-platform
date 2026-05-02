@@ -1,0 +1,55 @@
+<section class="auth-page">
+  <div class="auth-page__brand" aria-hidden="true">
+    <div class="auth-page__brand-inner">
+      <div class="auth-page__logo">eSign</div>
+      <p class="auth-page__tagline">
+        Signature électronique sécurisée, traçabilité et conformité — dans une interface claire et rapide.
+      </p>
+      <ul class="auth-page__bullets">
+        <li>Flux simples ou workflows hiérarchiques</li>
+        <li>PDF signés avec annexes de preuve</li>
+        <li>Journal d’audit et vérification des signatures</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="auth-page__panel">
+    <div class="auth-card">
+      <header class="auth-card__header">
+        <h1>Connexion</h1>
+        <p>Accédez à votre espace documents et signatures.</p>
+      </header>
+
+      @if (errorMessage()) {
+        <div class="error-banner" role="alert">{{ errorMessage() }}</div>
+      }
+
+      <form [formGroup]="loginForm" (ngSubmit)="onSubmit()" novalidate class="auth-form">
+        <div class="field">
+          <label for="email">Adresse e-mail</label>
+          <input id="email" type="email" formControlName="email" placeholder="vous@exemple.com" autocomplete="username" />
+          @if (loginForm.controls.email.touched && loginForm.controls.email.invalid) {
+            <small class="field-error">Veuillez saisir un e-mail valide.</small>
+          }
+        </div>
+
+        <div class="field">
+          <label for="password">Mot de passe</label>
+          <input id="password" type="password" formControlName="password" placeholder="••••••••" autocomplete="current-password" />
+          @if (loginForm.controls.password.touched && loginForm.controls.password.invalid) {
+            <small class="field-error">Le mot de passe doit contenir au moins 8 caractères.</small>
+          }
+        </div>
+
+        <button type="submit" class="btn-submit" [disabled]="isLoading()">
+          @if (isLoading()) {
+            <span class="btn-submit__spinner" aria-hidden="true"></span>
+            Connexion…
+          } @else {
+            Se connecter
+          }
+        </button>
+      </form>
+    </div>
+  </div>
+</section>

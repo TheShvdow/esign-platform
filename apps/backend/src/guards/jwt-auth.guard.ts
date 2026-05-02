@@ -6,23 +6,31 @@ import {
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { JsonWebTokenError, TokenExpiredError } from 'jsonwebtoken';
+import { User } from '../entities/user.entity';
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
-  canActivate(context: ExecutionContext) {
-    return super.canActivate(context);
+  canActivate(context: ExecutionContext): boolean {
+    return super.canActivate(context) as boolean;
   }
 
-  handleRequest(err: any, user: any, info: any) {
+  handleRequest<TUser = User>(
+    err: Error | null,
+    user: false | TUser | null,
+    info: Error | null,
+  ): TUser {
     if (err || !user) {
       if (info instanceof TokenExpiredError) {
         throw new UnauthorizedException('Token has expired');
-      } else if (info instanceof JsonWebTokenError) {
-        throw new UnauthorizedException('Invalid token');
-      } else {
-        throw new UnauthorizedException('Authentication failed');
       }
+
+      if (info instanceof JsonWebTokenError) {
+        throw new UnauthorizedException('Invalid token');
+      }
+
+      throw new UnauthorizedException('Authentication failed');
     }
+
     return user;
   }
 }

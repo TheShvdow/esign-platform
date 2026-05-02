@@ -10,34 +10,34 @@ import {
 @Entity('certificates')
 export class Certificate {
   @PrimaryGeneratedColumn('uuid')
-  id: string;
+  id!: string;
 
   @Column('uuid')
-  userId: string;
+  userId!: string;
 
   @Column()
-  serialNumber: string;
+  serialNumber!: string;
 
   @Column()
-  subject: string;
+  subject!: string;
 
   @Column()
-  issuer: string;
+  issuer!: string;
 
   @Column('text')
-  certificatePem: string;
+  certificatePem!: string;
 
   @Column('text', { nullable: true })
   privateKeyPem?: string;
 
   @Column()
-  notBefore: Date;
+  notBefore!: Date;
 
   @Column()
-  notAfter: Date;
+  notAfter!: Date;
 
   @Column({ default: false })
-  isRevoked: boolean;
+  isRevoked!: boolean;
 
   @Column({ nullable: true })
   revokedAt?: Date;
@@ -52,10 +52,10 @@ export class Certificate {
   extendedKeyUsage?: string[];
 
   @CreateDateColumn()
-  createdAt: Date;
+  createdAt!: Date;
 
   @UpdateDateColumn()
-  updatedAt: Date;
+  updatedAt!: Date;
 
   // Méthodes utilitaires
   isExpired(): boolean {

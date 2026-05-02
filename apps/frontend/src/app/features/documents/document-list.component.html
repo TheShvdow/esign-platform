@@ -1,0 +1,123 @@
+<div class="document-list">
+  <div class="list-header">
+    <h3>Documents <span class="count">({{ totalCount() }})</span></h3>
+    <div class="list-controls">
+      <select
+        [ngModel]="selectedStatus()"
+        (ngModelChange)="selectedStatus.set($event)"
+        class="status-filter">
+        <option value="">Tous les statuts</option>
+        <option value="DRAFT">Brouillon</option>
+        <option value="PENDING_SIGNATURE">En attente</option>
+        <option value="PARTIALLY_SIGNED">Partiellement signé</option>
+        <option value="FULLY_SIGNED">Signé</option>
+        <option value="EXPIRED">Expiré</option>
+        <option value="REJECTED">Rejeté</option>
+        <option value="ARCHIVED">Archivé</option>
+      </select>
+
+      <button
+        type="button"
+        class="refresh-btn"
+        [disabled]="isLoading()"
+        (click)="loadDocuments()">
+        Actualiser
+      </button>
+    </div>
+  </div>
+
+  @if (isLoading()) {
+    <div class="loading-state">
+      <div class="spinner" aria-hidden="true"></div>
+      <p>Chargement des documents…</p>
+    </div>
+  } @else if (filteredDocuments().length === 0) {
+    <div class="empty-state">
+      <div class="empty-illustration" aria-hidden="true"></div>
+      <h4>Aucun document trouvé</h4>
+      <p>
+        @if (selectedStatus()) {
+          Aucun document avec ce statut.
+        } @else {
+          Importez un fichier pour commencer.
+        }
+      </p>
+    </div>
+  } @else {
+    <div class="documents-grid">
+      @for (document of filteredDocuments(); track document.id) {
+        <article class="document-card" (click)="viewDocument(document.id)">
+          <div class="card-header">
+            <div class="document-thumb" aria-hidden="true"></div>
+            <div class="status-badge" [class]="'status-' + document.status">
+              {{ getStatusLabel(document.status) }}
+            </div>
+          </div>
+
+          <div class="card-content">
+            <h4 class="document-title">{{ document.title }}</h4>
+            @if (document.description) {
+              <p class="document-description">{{ document.description }}</p>
+            }
+
+            <dl class="document-meta">
+              <div class="meta-row">
+                <dt>Propriétaire</dt>
+                <dd>{{ document.owner.firstName }} {{ document.owner.lastName }}</dd>
+              </div>
+              <div class="meta-row">
+                <dt>Signatures</dt>
+                <dd>{{ document.signatures.length }}</dd>
+              </div>
+              <div class="meta-row">
+                <dt>Créé</dt>
+                <dd>{{ formatDate(document.createdAt) }}</dd>
+              </div>
+              <div class="meta-row">
+                <dt>Taille</dt>
+                <dd>{{ formatFileSize(document.fileSize) }}</dd>
+              </div>
+            </dl>
+          </div>
+
+          <div class="card-actions">
+            <button
+              type="button"
+              class="action-btn view-btn"
+              (click)="viewDocument(document.id); $event.stopPropagation()">
+              Ouvrir
+            </button>
+
+            @if (canSign(document)) {
+              <button
+                type="button"
+                class="action-btn sign-btn"
+                (click)="signDocument(document.id); $event.stopPropagation()">
+                Signer
+              </button>
+            }
+
+            <button
+              type="button"
+              class="action-btn download-btn"
+              (click)="downloadDocument(document); $event.stopPropagation()">
+              PDF
+            </button>
+          </div>
+        </article>
+      }
+    </div>
+
+    @if (hasMorePages()) {
+      <div class="pagination">
+        <button
+          type="button"
+          class="pagination-btn"
+          [disabled]="isLoading()"
+          (click)="loadNextPage()">
+          Charger plus de documents
+        </button>
+      </div>
+    }
+  }
+</div>

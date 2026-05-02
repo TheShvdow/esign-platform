@@ -14,38 +14,38 @@ import { AuditLog } from './audit-log.entity';
 @Entity('users')
 export class User {
   @PrimaryGeneratedColumn('uuid')
-  id: string;
+  id!: string;
 
   @Column({ unique: true })
-  email: string;
+  email!: string;
 
   @Column()
-  firstName: string;
+  firstName!: string;
 
   @Column()
-  lastName: string;
+  lastName!: string;
 
   @Column({ select: false })
-  passwordHash: string;
+  passwordHash!: string;
 
   @Column({
     type: 'enum',
     enum: UserRole,
     default: UserRole.USER,
   })
-  role: UserRole;
+  role!: UserRole;
 
   @Column({ default: true })
-  isActive: boolean;
+  isActive!: boolean;
 
   @Column({ default: false })
-  emailVerified: boolean;
+  emailVerified!: boolean;
 
   @Column({ nullable: true })
   mfaSecret?: string;
 
   @Column({ default: false })
-  mfaEnabled: boolean;
+  mfaEnabled!: boolean;
 
   @Column({ nullable: true })
   lastLoginAt?: Date;
@@ -54,27 +54,34 @@ export class User {
   lastLoginIp?: string;
 
   @CreateDateColumn()
-  createdAt: Date;
+  createdAt!: Date;
 
   @UpdateDateColumn()
-  updatedAt: Date;
+  updatedAt!: Date;
 
   @OneToMany(() => Document, (document) => document.owner)
-  documents: Document[];
+  documents!: Document[];
 
   @OneToMany(() => AuditLog, (log) => log.user)
-  auditLogs: AuditLog[];
+  auditLogs!: AuditLog[];
 
   // Méthodes utilitaires
   getFullName(): string {
     return `${this.firstName} ${this.lastName}`;
   }
 
+  /**
+   * Hiérarchie de permission : un rôle « supérieur » satisfait les contraintes des rôles inférieurs
+   * (ex. ADMIN peut tout faire ; DIRECTOR inclut les contraintes MANAGER si codées ainsi).
+   */
   hasRole(role: UserRole): boolean {
-    const roleHierarchy = {
-      [UserRole.ADMIN]: 1,
-      [UserRole.USER]: 2,
+    const rank: Record<UserRole, number> = {
+      [UserRole.ADMIN]: 100,
+      [UserRole.DIRECTOR]: 80,
+      [UserRole.MANAGER]: 60,
+      [UserRole.VALIDATOR]: 40,
+      [UserRole.USER]: 20,
     };
-    return roleHierarchy[this.role] >= roleHierarchy[role];
+    return rank[this.role] >= rank[role];
   }
 }

@@ -26,7 +26,7 @@ describe('PermissionService', () => {
       const user = {
         id: 'user-1',
         hasRole: jest.fn().mockReturnValue(false),
-      } as unknown as User;
+      } as User;
 
       const document = {
         ownerId: 'user-1',
@@ -39,7 +39,7 @@ describe('PermissionService', () => {
       const user = {
         id: 'user-2',
         hasRole: jest.fn().mockReturnValue(true),
-      } as unknown as User;
+      } as User;
 
       const document = {
         ownerId: 'user-1',
@@ -53,7 +53,7 @@ describe('PermissionService', () => {
       const user = {
         id: 'user-2',
         hasRole: jest.fn().mockReturnValue(false),
-      } as unknown as User;
+      } as User;
 
       const document = {
         ownerId: 'user-1',
@@ -69,7 +69,7 @@ describe('PermissionService', () => {
       const user = {
         id: 'user-1',
         hasRole: jest.fn().mockReturnValue(false),
-      } as unknown as User;
+      } as User;
 
       const document = {
         ownerId: 'user-1',
@@ -82,7 +82,7 @@ describe('PermissionService', () => {
       const user = {
         id: 'user-2',
         hasRole: jest.fn().mockReturnValue(true),
-      } as unknown as User;
+      } as User;
 
       const document = {
         ownerId: 'user-1',
@@ -95,7 +95,7 @@ describe('PermissionService', () => {
       const user = {
         id: 'user-2',
         hasRole: jest.fn().mockReturnValue(false),
-      } as unknown as User;
+      } as User;
 
       const document = {
         ownerId: 'user-1',

@@ -7,7 +7,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DocumentService } from './document.service';
 import { Document } from '../entities/document.entity';
 import { User } from '../entities/user.entity';
-import { DocumentStatus, UserRole } from '../types/global.types';
+import { AuthenticatedRequest, DocumentStatus, SignatureType, UserRole } from '../types/global.types';
 import { CryptographyService } from './cryptography.service';
 import { StorageService } from './storage.service';
 import { AuditService } from './audit.service';
@@ -15,6 +15,7 @@ import { FileValidationService } from './file-validation.service';
 import { DocumentMapperService } from './document-mapper.service';
 import { PermissionService } from './permission.service';
 import { SignatureCreationService } from './signature-creation.service';
+import { SignedPdfAnnexService } from './signed-pdf-annex.service';
 
 describe('DocumentService', () => {
   let service: DocumentService;
@@ -163,6 +164,14 @@ describe('DocumentService', () => {
             }),
           },
         },
+        {
+          provide: SignedPdfAnnexService,
+          useValue: {
+            embedAnnexForSignedPdf: jest
+              .fn()
+              .mockImplementation((b: Buffer) => Promise.resolve(b)),
+          },
+        },
       ],
     }).compile();
 
@@ -194,6 +203,7 @@ describe('DocumentService', () => {
 
       jest.spyOn(documentRepository, 'create').mockReturnValue(mockDocument);
       jest.spyOn(documentRepository, 'save').mockResolvedValue(mockDocument);
+      jest.spyOn(documentRepository, 'findOne').mockResolvedValue(mockDocument);
 
       const result = await service.create(createDto, file, mockUser);
 
@@ -201,7 +211,13 @@ describe('DocumentService', () => {
       expect(storageService.store).toHaveBeenCalled();
       expect(cryptographyService.generateHash).toHaveBeenCalled();
       expect(auditService.log).toHaveBeenCalled();
-      expect(eventEmitter.emit).toHaveBeenCalledWith('document.created', expect.any(Object));
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        'document.created',
+        expect.objectContaining({
+          document: mockDocument,
+          user: mockUser,
+        }),
+      );
     });
   });
 
@@ -230,7 +246,7 @@ describe('DocumentService', () => {
   describe('signDocument', () => {
     it('should sign document successfully', async () => {
       const signDto = {
-        signatureType: 'ADVANCED' as any,
+        signatureType: SignatureType.ADVANCED,
         certificateId: 'cert-123',
       };
 
@@ -238,10 +254,13 @@ describe('DocumentService', () => {
         .mockResolvedValueOnce(mockDocument) // First call for loading
         .mockResolvedValueOnce(mockDocument); // Second call after transaction
 
-      const result = await service.signDocument('doc-1', signDto, mockUser, {
+      const request: AuthenticatedRequest = {
         ip: '127.0.0.1',
         headers: { 'user-agent': 'test' },
-      } as any);
+        user: mockUser,
+      } as AuthenticatedRequest;
+
+      const result = await service.signDocument('doc-1', signDto, mockUser, request);
 
       expect(result).toBeDefined();
       expect(cryptographyService.signData).toHaveBeenCalled();
@@ -257,9 +276,9 @@ describe('DocumentService', () => {
 
       await expect(
         service.signDocument('doc-1', {
-          signatureType: 'ADVANCED' as any,
+          signatureType: SignatureType.ADVANCED,
           certificateId: 'cert-123',
-        }, mockUser, {} as any),
+        }, mockUser, { user: mockUser } as AuthenticatedRequest),
       ).rejects.toThrow(BadRequestException);
     });
   });

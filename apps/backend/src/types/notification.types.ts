@@ -12,7 +12,14 @@ export interface NotificationTemplate {
 export interface NotificationRequest {
   to: string[];
   template: string;
-  variables: Record<string, any>;
+  variables: NotificationTemplateVariables;
   priority?: 'low' | 'normal' | 'high' | 'urgent';
   scheduleAt?: Date;
+}
+
+export interface NotificationTemplateVariables {
+  documentTitle?: string;
+  signerName?: string;
+  ownerName?: string;
+  actionUrl?: string;
 }

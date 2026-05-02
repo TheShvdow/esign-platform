@@ -11,8 +11,30 @@ import {
 import { UserRole } from '../types/global.types';
 
 export class UserDto {
+  constructor(
+    id: string,
+    email: string,
+    firstName: string,
+    lastName: string,
+    role: UserRole,
+    isActive: boolean,
+    emailVerified: boolean,
+    mfaEnabled: boolean,
+    createdAt: Date,
+  ) {
+    this.id = id;
+    this.email = email;
+    this.firstName = firstName;
+    this.lastName = lastName;
+    this.role = role;
+    this.isActive = isActive;
+    this.emailVerified = emailVerified;
+    this.mfaEnabled = mfaEnabled;
+    this.createdAt = createdAt;
+  }
   @ApiProperty()
-  id: string;
+  @ApiProperty()
+id: string; // Initialiser dans le constructeur ou utiliser le point d'interrogation si optionnel.
 
   @ApiProperty()
   email: string;
@@ -27,19 +49,30 @@ export class UserDto {
   role: UserRole;
 
   @ApiProperty()
-  isActive: boolean;
+  @ApiProperty()
+isActive: boolean; // Initialiser dans le constructeur ou utiliser le point d'interrogation si optionnel.
 
   @ApiProperty()
-  emailVerified: boolean;
+  @ApiProperty()
+emailVerified: boolean; // Initialiser dans le constructeur ou utiliser le point d'interrogation si optionnel.
 
   @ApiProperty()
-  mfaEnabled: boolean;
+  @ApiProperty()
+mfaEnabled: boolean; // Initialiser dans le constructeur ou utiliser le point d'interrogation si optionnel.
 
   @ApiProperty()
-  createdAt: Date;
+  @ApiProperty()
+createdAt: Date; // Initialiser dans le constructeur ou utiliser le point d'interrogation si optionnel.
 }
 
 export class LoginDto {
+  constructor(
+    email: string,
+    password: string,
+  ) {
+    this.email = email;
+    this.password = password;
+  }
   @ApiProperty({ 
     example: 'derisswvde@gmail.com',
     description: 'User email address'
@@ -58,6 +91,19 @@ export class LoginDto {
 }
 
 export class RegisterDto {
+  constructor(
+    email: string,
+    password: string,
+    firstName: string,
+    lastName: string,
+    role?: UserRole,
+  ) {
+    this.email = email;
+    this.password = password;
+    this.firstName = firstName;
+    this.lastName = lastName;
+    this.role = role;
+  }
   @ApiProperty({ 
     example: 'derisswvde@gmail.com',
     description: 'User email address'
@@ -102,28 +148,47 @@ export class RegisterDto {
   })
   @IsOptional()
   @IsEnum(UserRole, { message: 'Role must be either USER or ADMIN' })
-  role?: UserRole;
+  @IsOptional()
+@IsEnum(UserRole, { message: 'Role must be either USER or ADMIN' })
+@IsOptional()
+@IsEnum(UserRole, { message: 'Role must be either USER or ADMIN' })
+role?: UserRole; // Initialiser dans le constructeur ou utiliser le point d'interrogation si optionnel.
 }
 
 export class AuthResponseDto {
+  constructor(
+    accessToken: string,
+    refreshToken: string,
+    expiresIn: number,
+    user: UserDto,
+  ) {
+    this.accessToken = accessToken;
+    this.refreshToken = refreshToken;
+    this.expiresIn = expiresIn;
+    this.user = user;
+  }
   @ApiProperty({
     description: 'JWT access token'
   })
-  accessToken: string;
+  @ApiProperty()
+accessToken: string; // Initialiser dans le constructeur ou utiliser le point d'interrogation si optionnel.
 
   @ApiProperty({
     description: 'JWT refresh token'
   })
-  refreshToken: string;
+  @ApiProperty()
+refreshToken: string; // Initialiser dans le constructeur ou utiliser le point d'interrogation si optionnel.
 
   @ApiProperty({
     description: 'Token expiration time in seconds'
   })
-  expiresIn: number;
+  @ApiProperty()
+expiresIn: number; // Initialiser dans le constructeur ou utiliser le point d'interrogation si optionnel.
 
   @ApiProperty({ 
     type: UserDto,
     description: 'User information'
   })
-  user: UserDto;
+  @ApiProperty({ type: UserDto })
+user: UserDto; // Initialiser dans le constructeur ou utiliser le point d'interrogation si optionnel.
 }

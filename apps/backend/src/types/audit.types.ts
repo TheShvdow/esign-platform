@@ -30,7 +30,31 @@ export interface AuditLogRequest {
   userId: string;
   entityType: string;
   entityId: string;
-  details?: Record<string, any>;
+  details?: AuditDetails;
   ipAddress?: string;
   userAgent?: string;
 }
+
+export interface DocumentUploadAuditDetails {
+  fileName: string;
+  fileSize: number;
+  fileHash: string;
+}
+
+export interface DocumentSignAuditDetails {
+  signatureType: string;
+  certificateId: string;
+  signatureProgress: number;
+}
+
+export interface DocumentVerifyAuditDetails {
+  isValid: boolean;
+  signatureCount: number;
+  requiredSignatures: number;
+}
+
+export type AuditDetails =
+  | DocumentUploadAuditDetails
+  | DocumentSignAuditDetails
+  | DocumentVerifyAuditDetails
+  | Record<string, string | number | boolean | null>;

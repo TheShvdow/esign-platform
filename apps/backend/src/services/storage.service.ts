@@ -1,6 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { AppConfig } from '../config/configuration';
 import * as crypto from 'crypto';
+import * as fs from 'fs';
+import * as fsp from 'fs/promises';
+import * as path from 'path';
 
 export interface StorageOptions {
   fileName: string;
@@ -9,10 +13,16 @@ export interface StorageOptions {
   encryption?: boolean;
 }
 
-// ⚠️ Implémentation temporaire en mémoire pour valider le flux
-// upload → signature → vérification.
-// À remplacer plus tard par un vrai stockage sécurisé (S3, filesystem chiffré, etc.).
-const inMemoryStore = new Map<string, Buffer>();
+/** Cache mémoire optionnelle pour éviter des lectures disque répétées (même processus). */
+const memoryCache = new Map<string, Buffer>();
+
+/**
+ * Chemin stable vers `apps/backend/storage/uploads`, indépendant de `process.cwd()`
+ * (sinon upload depuis la racine du repo vs depuis `apps/backend` écrit/lit deux dossiers différents).
+ */
+function defaultStorageRoot(): string {
+  return path.resolve(__dirname, '..', '..', 'storage', 'uploads');
+}
 
 @Injectable()
 export class StorageService {
@@ -20,27 +30,80 @@ export class StorageService {
 
   async store(data: Buffer, options: StorageOptions): Promise<string> {
     const storageKey = this.generateStorageKey(options);
-    // Stockage brut en mémoire pour le moment
-    inMemoryStore.set(storageKey, data);
+    const filePath = this.resolveSafePath(storageKey);
+    await fsp.mkdir(path.dirname(filePath), { recursive: true });
+    await fsp.writeFile(filePath, data);
+    memoryCache.set(storageKey, data);
     return storageKey;
   }
 
   async retrieve(storageKey: string): Promise<Buffer> {
-    const data = inMemoryStore.get(storageKey);
-    if (!data) {
+    const cached = memoryCache.get(storageKey);
+    if (cached) {
+      return cached;
+    }
+    const filePath = this.resolveSafePath(storageKey);
+    try {
+      const data = await fsp.readFile(filePath);
+      memoryCache.set(storageKey, data);
+      return data;
+    } catch {
       throw new Error(`File not found for storageKey=${storageKey}`);
     }
-    return data;
   }
 
-  // ✅ Méthode utilitaire pour nettoyer le stockage (utile pour les tests)
   async delete(storageKey: string): Promise<void> {
-    inMemoryStore.delete(storageKey);
+    memoryCache.delete(storageKey);
+    try {
+      await fsp.unlink(this.resolveSafePath(storageKey));
+    } catch {
+      /* fichier déjà absent */
+    }
   }
 
-  // ✅ Méthode pour obtenir la taille du stockage (monitoring)
+  /** Nombre de fichiers présents sous le répertoire de stockage. */
   getStorageSize(): number {
-    return inMemoryStore.size;
+    const base = this.getBaseDir();
+    if (!fs.existsSync(base)) {
+      return 0;
+    }
+    return this.countFilesSync(base);
+  }
+
+  private getBaseDir(): string {
+    const app = this.configService.get<AppConfig>('app');
+    return app?.storagePath || defaultStorageRoot();
+  }
+
+  /**
+   * Emploie la clé comme chemin relatif (ownerId/timestamp-random),
+   * sans permettre de sortir du répertoire de stockage.
+   */
+  private resolveSafePath(storageKey: string): string {
+    const normalized = path.normalize(storageKey).replace(/^[/\\]+/, '');
+    if (!normalized || normalized.includes('..')) {
+      throw new Error(`Invalid storage key: ${storageKey}`);
+    }
+    const base = path.resolve(this.getBaseDir());
+    const resolved = path.resolve(base, normalized);
+    if (!resolved.startsWith(base + path.sep) && resolved !== base) {
+      throw new Error(`Invalid storage key (path escape): ${storageKey}`);
+    }
+    return resolved;
+  }
+
+  private countFilesSync(dir: string): number {
+    let n = 0;
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const p = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        n += this.countFilesSync(p);
+      } else {
+        n += 1;
+      }
+    }
+    return n;
   }
 
   private generateStorageKey(options: StorageOptions): string {

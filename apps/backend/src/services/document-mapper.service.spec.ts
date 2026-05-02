@@ -2,7 +2,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { DocumentMapperService } from './document-mapper.service';
 import { Document } from '../entities/document.entity';
-import { DocumentStatus } from '../types/global.types';
+import { DocumentStatus, SignatureType, UserRole } from '../types/global.types';
 
 describe('DocumentMapperService', () => {
   let service: DocumentMapperService;
@@ -39,7 +39,7 @@ describe('DocumentMapperService', () => {
           email: 'test@example.com',
           firstName: 'John',
           lastName: 'Doe',
-          role: 'USER' as any,
+          role: UserRole.USER,
           isActive: true,
           emailVerified: true,
           mfaEnabled: false,
@@ -74,7 +74,7 @@ describe('DocumentMapperService', () => {
           email: 'test@example.com',
           firstName: 'John',
           lastName: 'Doe',
-          role: 'USER' as any,
+          role: UserRole.USER,
           isActive: true,
           emailVerified: true,
           mfaEnabled: false,
@@ -83,7 +83,7 @@ describe('DocumentMapperService', () => {
         signatures: [
           {
             id: 'sig-1',
-            type: 'ADVANCED' as any,
+            type: SignatureType.ADVANCED,
             certificateId: 'cert-1',
             isValid: true,
             createdAt: new Date(),
@@ -92,7 +92,7 @@ describe('DocumentMapperService', () => {
               email: 'signer@example.com',
               firstName: 'Jane',
               lastName: 'Smith',
-              role: 'USER' as any,
+              role: UserRole.USER,
               isActive: true,
               emailVerified: true,
               mfaEnabled: false,
@@ -129,7 +129,7 @@ describe('DocumentMapperService', () => {
             email: 'test@example.com',
             firstName: 'John',
             lastName: 'Doe',
-            role: 'USER' as any,
+            role: UserRole.USER,
             isActive: true,
             emailVerified: true,
             mfaEnabled: false,
@@ -153,7 +153,7 @@ describe('DocumentMapperService', () => {
             email: 'test@example.com',
             firstName: 'John',
             lastName: 'Doe',
-            role: 'USER' as any,
+            role: UserRole.USER,
             isActive: true,
             emailVerified: true,
             mfaEnabled: false,

@@ -18,52 +18,52 @@ import { User } from './user.entity';
 @Entity('signatures')
 export class Signature {
   @PrimaryGeneratedColumn('uuid')
-  id: string;
+  id!: string;
 
   @Column('uuid')
-  documentId: string;
+  documentId!: string;
 
   @Column('uuid')
-  signerId: string;
+  signerId!: string;
 
   @Column({
     type: 'enum',
     enum: SignatureType,
   })
-  type: SignatureType;
+  type!: SignatureType;
 
   @Column('text')
-  signatureValue: string;
+  signatureValue!: string;
 
   @Column('jsonb')
-  metadata: SignatureMetadata;
+  metadata!: SignatureMetadata;
 
   @Column('jsonb')
-  cryptographicEvidence: CryptographicEvidence;
+  cryptographicEvidence!: CryptographicEvidence;
 
   @Column()
-  certificateId: string;
+  certificateId!: string;
 
   @Column('text')
-  certificatePem: string;
+  certificatePem!: string;
 
   @Column({ nullable: true })
   tsaResponse?: string;
 
   @Column({ default: false })
-  isValid: boolean;
+  isValid!: boolean;
 
   @Column({ nullable: true })
   validationErrors?: string;
 
   @CreateDateColumn()
-  createdAt: Date;
+  createdAt!: Date;
 
   @ManyToOne(() => Document, (document) => document.signatures)
   @JoinColumn({ name: 'documentId' })
-  document: Document;
+  document!: Document;
 
   @ManyToOne(() => User)
   @JoinColumn({ name: 'signerId' })
-  signer: User;
+  signer!: User;
 }

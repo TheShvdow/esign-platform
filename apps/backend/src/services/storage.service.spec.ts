@@ -1,23 +1,36 @@
 // src/services/storage.service.spec.ts
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { StorageService } from './storage.service';
 
 describe('StorageService', () => {
   let service: StorageService;
+  let tmpDir: string;
 
   beforeEach(async () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'esign-storage-test-'));
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         StorageService,
         {
           provide: ConfigService,
-          useValue: {},
+          useValue: {
+            get: (key: string) =>
+              key === 'app' ? { storagePath: tmpDir } : undefined,
+          },
         },
       ],
     }).compile();
 
     service = module.get<StorageService>(StorageService);
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
   it('should be defined', () => {
@@ -49,8 +62,7 @@ describe('StorageService', () => {
       };
 
       const key1 = await service.store(data, options);
-      // Wait a bit to ensure different timestamp
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
       const key2 = await service.store(data, options);
 
       expect(key1).not.toBe(key2);
@@ -72,10 +84,35 @@ describe('StorageService', () => {
       expect(retrievedData).toEqual(originalData);
     });
 
+    it('should retrieve from disk after cache would be empty (new service)', async () => {
+      const originalData = Buffer.from('persisted');
+      const key = await service.store(originalData, {
+        fileName: 'a.bin',
+        mimeType: 'application/octet-stream',
+        ownerId: 'user-2',
+      });
+
+      const module2 = await Test.createTestingModule({
+        providers: [
+          StorageService,
+          {
+            provide: ConfigService,
+            useValue: {
+              get: (k: string) =>
+                k === 'app' ? { storagePath: tmpDir } : undefined,
+            },
+          },
+        ],
+      }).compile();
+      const fresh = module2.get<StorageService>(StorageService);
+
+      await expect(fresh.retrieve(key)).resolves.toEqual(originalData);
+    });
+
     it('should throw error for non-existent storage key', async () => {
-      await expect(
-        service.retrieve('non-existent-key'),
-      ).rejects.toThrow('File not found');
+      await expect(service.retrieve('non-existent-key')).rejects.toThrow(
+        'File not found',
+      );
     });
   });
 
@@ -91,9 +128,9 @@ describe('StorageService', () => {
       const storageKey = await service.store(data, options);
       await service.delete(storageKey);
 
-      await expect(
-        service.retrieve(storageKey),
-      ).rejects.toThrow('File not found');
+      await expect(service.retrieve(storageKey)).rejects.toThrow(
+        'File not found',
+      );
     });
   });
 

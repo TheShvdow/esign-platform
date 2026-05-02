@@ -18,9 +18,8 @@ import {
 import { AuthService } from '../services/auth.service';
 import { LoginDto, RegisterDto, AuthResponseDto } from '../dto/auth.dto';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
-import { RolesGuard } from '../guards/roles.guard';
-import { Roles } from '../decorators/roles.decorator';
-import { UserRole } from '../types/global.types';
+import { AuthenticatedRequest } from '../types/request.types';
+import { User } from '../entities/user.entity';
 
 @ApiTags('Authentication')
 @Controller('auth')
@@ -56,7 +55,7 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get user profile' })
-  async getProfile(@Request() req): Promise<any> {
+  async getProfile(@Request() req: AuthenticatedRequest): Promise<User> {
     return req.user;
   }
 
@@ -65,7 +64,7 @@ export class AuthController {
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'User logout' })
-  async logout(@Request() req): Promise<{ message: string }> {
+  async logout(@Request() req: AuthenticatedRequest): Promise<{ message: string }> {
     await this.authService.logout(req.user.id);
     return { message: 'Logout successful' };
   }

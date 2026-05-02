@@ -2,11 +2,41 @@
 import { Injectable } from '@nestjs/common';
 import { Document } from '../entities/document.entity';
 import { DocumentDto } from '../dto/document.dto';
+import type { User } from '../entities/user.entity';
 
 @Injectable()
 export class DocumentMapperService {
-  toDto(document: Document): DocumentDto {
-    return {
+  toDto(document: Document, viewer?: User): DocumentDto {
+    const wf =
+      typeof document.getOrderedWorkflow === 'function'
+        ? document.getOrderedWorkflow()
+        : [];
+    const completed =
+      typeof document.getCurrentSignatureCount === 'function'
+        ? document.getCurrentSignatureCount()
+        : document.signatures?.length ?? 0;
+
+    const requiredTotal =
+      wf.length > 0
+        ? wf.length
+        : typeof document.getRequiredSignatures === 'function'
+          ? document.getRequiredSignatures()
+          : 1;
+
+    const workflowSummary =
+      wf.length > 0
+        ? {
+            mode: 'sequential' as const,
+            stepsTotal: wf.length,
+            signaturesCompleted: completed,
+          }
+        : {
+            mode: 'parallel' as const,
+            stepsTotal: requiredTotal,
+            signaturesCompleted: completed,
+          };
+
+    const dto: DocumentDto = {
       id: document.id,
       title: document.title,
       description: document.description,
@@ -49,10 +79,18 @@ export class DocumentMapperService {
             createdAt: sig.signer.createdAt,
           },
         })) || [],
+      metadata: document.metadata,
+      workflowSummary,
     };
+
+    if (viewer && typeof document.canBeSignedBy === 'function') {
+      dto.maySign = document.canBeSignedBy(viewer);
+    }
+
+    return dto;
   }
 
-  toDtoList(documents: Document[]): DocumentDto[] {
-    return documents.map((doc) => this.toDto(doc));
+  toDtoList(documents: Document[], viewer?: User): DocumentDto[] {
+    return documents.map((doc) => this.toDto(doc, viewer));
   }
 }

@@ -1,0 +1,37 @@
+<div class="shell">
+  <header class="topbar">
+    <div class="topbar__brand">
+      <span class="topbar__logo">eSign</span>
+      <div class="topbar__titles">
+        <h1>Documents</h1>
+        <p class="topbar__welcome">Bonjour, {{ userName() }}</p>
+      </div>
+    </div>
+    <div class="topbar__actions">
+      @if (isAdmin()) {
+        <a routerLink="/admin" class="btn-admin">Administration</a>
+      }
+      <button type="button" class="btn-logout" (click)="logout()">
+        Déconnexion
+      </button>
+    </div>
+  </header>
+
+  <main class="shell__main">
+    <section class="panel panel--accent">
+      <div class="panel__head">
+        <h2>Nouveau document</h2>
+        <p class="panel__lede">Importez un fichier, définissez les participants ou un workflow JSON.</p>
+      </div>
+      <app-document-upload (documentUploaded)="onDocumentUploaded()"></app-document-upload>
+    </section>
+
+    <section class="panel">
+      <div class="panel__head">
+        <h2>Bibliothèque</h2>
+        <p class="panel__lede">Filtrez par statut, ouvrez le détail ou téléchargez le PDF signé.</p>
+      </div>
+      <app-document-list></app-document-list>
+    </section>
+  </main>
+</div>

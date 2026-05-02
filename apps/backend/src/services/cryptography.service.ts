@@ -2,7 +2,7 @@
 import { Injectable } from '@nestjs/common';
 import * as crypto from 'crypto';
 import * as forge from 'node-forge';
-import { SignatureType, SigningOptions } from '../types/global.types';
+import { CryptographicEvidence, SignatureType, SigningOptions } from '../types/global.types';
 import { HSMService } from './hsm.service';
 import { CertificateService } from './certificate.service';
 import { TSAService } from './tsa.service';
@@ -15,7 +15,7 @@ export interface SignatureRequest {
 
 export interface SignatureResult {
   signature: string;
-  evidence: any;
+  evidence: CryptographicEvidence;
 }
 
 @Injectable()
@@ -48,10 +48,11 @@ export class CryptographyService {
 
     const signingOptions = this.getSigningOptions(signatureType);
     const certificate = forge.pki.certificateFromPem(certificatePem);
+    const privateKey = forge.pki.privateKeyFromPem(privateKeyPem);
     p7.addCertificate(certificate);
-    
+
     p7.addSigner({
-      key: privateKeyPem,
+      key: privateKey,
       certificate: certificate,
       digestAlgorithm: forge.pki.oids.sha256,
       authenticatedAttributes: signingOptions.authenticatedAttributes,
@@ -62,7 +63,7 @@ export class CryptographyService {
     const p7Asn1 = p7.toAsn1();
     const signature = forge.util.encode64(forge.asn1.toDer(p7Asn1).getBytes());
 
-    const evidence: any = {
+    const evidence: CryptographicEvidence = {
       hash,
       algorithm: 'sha256',
       timestamp: new Date(),
@@ -93,7 +94,8 @@ export class CryptographyService {
       let verified = false;
       try {
         if (p7.certificates && p7.certificates.length > 0) {
-          const certificateMatches = p7.certificates.some((cert: any) => {
+          const certificates = p7.certificates as forge.pki.Certificate[];
+          const certificateMatches = certificates.some((cert) => {
             try {
               const certPem = forge.pki.certificateToPem(cert);
               return certPem === certificatePem;
@@ -103,7 +105,7 @@ export class CryptographyService {
           });
           verified = certificateMatches;
         }
-      } catch (error) {
+      } catch {
         verified = false;
       }
 
@@ -129,7 +131,9 @@ export class CryptographyService {
     } catch (error) {
       return {
         isValid: false,
-        errors: [`Verification error: ${error.message}`],
+        errors: [
+          `Verification error: ${error instanceof Error ? error.message : 'Unexpected error'}`,
+        ],
       };
     }
   }
@@ -139,7 +143,7 @@ export class CryptographyService {
     
     const baseAttributes = [
       {
-        type: forge.pki.oids.contentTypes,
+        type: forge.pki.oids.contentType,
         value: forge.pki.oids.data,
       },
       {

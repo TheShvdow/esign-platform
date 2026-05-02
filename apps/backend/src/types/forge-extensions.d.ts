@@ -4,8 +4,8 @@ import 'node-forge';
 declare module 'node-forge' {
   namespace pkcs7 {
     interface SignedData {
-      signers: any[];
-      certificates: any[];
+      signers: Array<{ digestAlgorithm?: string }>;
+      certificates: pki.Certificate[];
     }
   }
 }

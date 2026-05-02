@@ -1,4 +1,5 @@
 // src/config/configuration.ts
+import * as path from 'path';
 import { registerAs } from '@nestjs/config';
 
 export interface DatabaseConfig {
@@ -40,6 +41,8 @@ export interface AppConfig {
   maxFileSize: number;
   rateLimitTtl: number;
   rateLimitLimit: number;
+  /** Répertoire racine pour les fichiers uploadés (survit aux redémarrages du processus). */
+  storagePath: string;
 }
 
 export default registerAs(
@@ -54,5 +57,8 @@ export default registerAs(
     maxFileSize: parseInt(process.env.MAX_FILE_SIZE || '10485760', 10), // 10MB
     rateLimitTtl: parseInt(process.env.RATE_LIMIT_TTL || '60000', 10),
     rateLimitLimit: parseInt(process.env.RATE_LIMIT_LIMIT || '100', 10),
+    storagePath:
+      process.env.STORAGE_PATH ||
+      path.resolve(__dirname, '..', '..', 'storage', 'uploads'),
   }),
 );

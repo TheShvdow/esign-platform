@@ -1,6 +1,6 @@
 // src/services/signature-creation.service.ts
 import { Injectable } from '@nestjs/common';
-import { QueryRunner } from 'typeorm';
+import { QueryRunner, Repository } from 'typeorm';
 import { Signature } from '../entities/signature.entity';
 import { Document } from '../entities/document.entity';
 import { User } from '../entities/user.entity';
@@ -18,7 +18,7 @@ export class SignatureCreationService {
     signatureResult: SignatureResult,
     request: AuthenticatedRequest,
     isValid: boolean = false,
-    validationErrors: string | null = null,
+    validationErrors: string | null,
   ): Promise<Signature> {
     // ✅ Bug 1 Fix: Assurer que signedAt est toujours inclus
     const metadata: SignatureMetadata = {
@@ -33,10 +33,13 @@ export class SignatureCreationService {
         signatureResult.evidence.certificateChain[0]) ||
       '';
 
-    // ✅ Bug 2 Fix: isValid doit être déterminé par vérification réelle, pas hardcodé
-    const signature = queryRunner.manager.create(Signature, {
-      documentId: document.id,
-      signerId: user.id,
+    // Relations `document` / `signer` (pas seulement les IDs) : avec @JoinColumn sur la même
+    // colonne qu’un @Column explicite, TypeORM peut insérer NULL pour documentId si on ne passe que l’ID.
+    const signatureData: Partial<Signature> & {
+      validationErrors?: string | null;
+    } = {
+      document,
+      signer: user,
       type: signDto.signatureType,
       signatureValue: signatureResult.signature,
       metadata,
@@ -44,9 +47,14 @@ export class SignatureCreationService {
       certificateId: signDto.certificateId,
       certificatePem,
       tsaResponse: signatureResult.evidence?.tsaResponse,
-      isValid, // ✅ Utiliser la valeur vérifiée au lieu de hardcoder true
-      validationErrors, // ✅ Inclure les erreurs de validation si présentes
-    });
+      isValid,
+    };
+
+    if (validationErrors !== undefined) {
+      signatureData.validationErrors = validationErrors ?? undefined;
+    }
+
+    const signature = queryRunner.manager.create(Signature, signatureData);
 
     return queryRunner.manager.save(Signature, signature);
   }
@@ -57,9 +65,9 @@ export class SignatureCreationService {
     signDto: SignDocumentDto,
     signatureResult: SignatureResult,
     request: AuthenticatedRequest,
-    signatureRepository: any,
+    signatureRepository: Repository<Signature>,
     isValid: boolean = false,
-    validationErrors: string | null = null,
+    validationErrors?: string,
   ): Promise<Signature> {
     // ✅ Bug 1 Fix: Assurer que signedAt est toujours inclus
     const metadata: SignatureMetadata = {
@@ -76,8 +84,8 @@ export class SignatureCreationService {
 
     // ✅ Bug 2 Fix: isValid doit être déterminé par vérification réelle, pas hardcodé
     const signature = signatureRepository.create({
-      documentId: document.id,
-      signerId: user.id,
+      document,
+      signer: user,
       type: signDto.signatureType,
       signatureValue: signatureResult.signature,
       metadata,
@@ -85,8 +93,8 @@ export class SignatureCreationService {
       certificateId: signDto.certificateId,
       certificatePem,
       tsaResponse: signatureResult.evidence?.tsaResponse,
-      isValid, // ✅ Utiliser la valeur vérifiée au lieu de hardcoder true
-      validationErrors, // ✅ Inclure les erreurs de validation si présentes
+      isValid,
+      validationErrors,
     });
 
     return signatureRepository.save(signature);

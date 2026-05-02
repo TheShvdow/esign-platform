@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AuditLog } from '../entities/audit-log.entity';
-import { AuditAction } from '../types/global.types';
+import { AuditAction, AuditDetails } from '../types/global.types';
 import * as crypto from 'crypto';
 
 export interface AuditLogRequest {
@@ -10,7 +10,7 @@ export interface AuditLogRequest {
   userId?: string;
   entityType?: string;
   entityId?: string;
-  details: Record<string, unknown>;
+  details: AuditDetails;
   ipAddress?: string;
   userAgent?: string;
   sessionId?: string;
@@ -41,8 +41,9 @@ export class AuditService {
   }
 
   private async getLastHash(): Promise<string> {
-    const lastLog = await this.auditRepository.findOne({
-      order: { createdAt: 'DESC' }
+    const [lastLog] = await this.auditRepository.find({
+      order: { createdAt: 'DESC' },
+      take: 1,
     });
     return lastLog?.cryptographicHash || 'genesis';
   }

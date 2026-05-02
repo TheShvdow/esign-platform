@@ -1,0 +1,462 @@
+<div class="admin-shell">
+  <header class="admin-topbar">
+    <div class="admin-topbar__brand">
+      <a routerLink="/documents" class="admin-back">Documents</a>
+      <span class="admin-title">Administration</span>
+      <span class="admin-badge">Pilotage</span>
+    </div>
+    <button
+      type="button"
+      class="btn-refresh"
+      (click)="refreshAll()"
+      [disabled]="usersLoading()">
+      Actualiser tout
+    </button>
+  </header>
+
+  @if (statsError()) {
+    <div class="banner banner--error">{{ statsError() }}</div>
+  }
+
+  @if (docActionError()) {
+    <div class="banner banner--error">{{ docActionError() }}</div>
+  }
+
+  <section id="insights" class="panel panel--hero">
+    <h2>Indicateurs</h2>
+    @if (stats(); as s) {
+      <div class="kpi-grid">
+        <article class="kpi">
+          <span class="kpi__label">Utilisateurs</span>
+          <strong class="kpi__value">{{ s.users.total }}</strong>
+          <span class="kpi__hint">{{ s.users.active }} actifs</span>
+        </article>
+        <article class="kpi">
+          <span class="kpi__label">Documents</span>
+          <strong class="kpi__value">{{ s.documents.total }}</strong>
+          <span class="kpi__hint">{{ formatBytes(s.documents.totalBytesStored) }} stockés</span>
+        </article>
+        <article class="kpi">
+          <span class="kpi__label">Signatures</span>
+          <strong class="kpi__value">{{ s.signatures.total }}</strong>
+          <span class="kpi__hint">cumulées</span>
+        </article>
+        <article class="kpi">
+          <span class="kpi__label">Audit (7 j.)</span>
+          <strong class="kpi__value">{{ s.audit.entriesLast7Days }}</strong>
+          <span class="kpi__hint">{{ s.audit.totalEntries }} entrées totales</span>
+        </article>
+      </div>
+
+      <div class="charts-grid">
+        <div class="chart-card">
+          <h3>Documents déposés / jour</h3>
+          @if (chartLabels().length) {
+            <app-admin-chart
+              chartTitle="Documents"
+              [labels]="chartLabels()"
+              [values]="chartDocs()"
+              variant="bar"
+              color="#0d9488">
+            </app-admin-chart>
+          } @else {
+            <p class="muted">Pas encore de données.</p>
+          }
+        </div>
+        <div class="chart-card">
+          <h3>Nouveaux comptes / jour</h3>
+          @if (chartLabels().length) {
+            <app-admin-chart
+              chartTitle="Utilisateurs"
+              [labels]="chartLabels()"
+              [values]="chartUsers()"
+              variant="line"
+              color="#6366f1">
+            </app-admin-chart>
+          }
+        </div>
+        <div class="chart-card">
+          <h3>Signatures / jour</h3>
+          @if (chartLabels().length) {
+            <app-admin-chart
+              chartTitle="Signatures"
+              [labels]="chartLabels()"
+              [values]="chartSigs()"
+              variant="line"
+              color="#059669">
+            </app-admin-chart>
+          }
+        </div>
+      </div>
+
+      <div class="breakdown">
+        <div class="breakdown__block">
+          <h3>Rôles</h3>
+          <ul class="breakdown__list">
+            @for (opt of roleOptions; track opt.value) {
+              @if (s.users.byRole[opt.value]) {
+                <li>
+                  <span>{{ opt.label }}</span>
+                  <strong>{{ s.users.byRole[opt.value] }}</strong>
+                </li>
+              }
+            }
+          </ul>
+        </div>
+        <div class="breakdown__block">
+          <h3>Statuts documents</h3>
+          <ul class="breakdown__list">
+            @for (st of ['DRAFT','PENDING_SIGNATURE','PARTIALLY_SIGNED','FULLY_SIGNED','EXPIRED','REJECTED','ARCHIVED']; track st) {
+              @if (s.documents.byStatus[st]) {
+                <li>
+                  <span>{{ docStatusLabel(st) }}</span>
+                  <strong>{{ s.documents.byStatus[st] }}</strong>
+                </li>
+              }
+            }
+          </ul>
+        </div>
+      </div>
+    } @else {
+      <p class="muted">Chargement des statistiques…</p>
+    }
+  </section>
+
+  <nav class="subnav" aria-label="Sections">
+    <a href="#users">Comptes</a>
+    <a href="#documents">Documents</a>
+    <a href="#audit">Audit</a>
+  </nav>
+
+  <section id="users" class="panel">
+    <div class="panel__head">
+      <h2>Utilisateurs &amp; privilèges</h2>
+      <p class="lede">Filtrez par rôle ou recherchez par nom / e-mail.</p>
+    </div>
+
+    <div class="filters-bar">
+      <label class="filter-field">
+        <span>Recherche</span>
+        <input
+          type="search"
+          [(ngModel)]="userFilterQ"
+          (keyup.enter)="applyUserFilters(1)"
+          placeholder="E-mail, prénom, nom…"
+          class="filter-input">
+      </label>
+      <label class="filter-field">
+        <span>Rôle</span>
+        <select [(ngModel)]="userFilterRole" class="filter-input">
+          <option value="">Tous</option>
+          @for (opt of roleOptions; track opt.value) {
+            <option [value]="opt.value">{{ opt.label }}</option>
+          }
+        </select>
+      </label>
+      <button type="button" class="btn-filter" (click)="applyUserFilters(1)">
+        Appliquer
+      </button>
+    </div>
+
+    @if (usersLoading()) {
+      <p class="muted">Chargement…</p>
+    } @else {
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Utilisateur</th>
+              <th>Rôle</th>
+              <th>Actif</th>
+              <th>Créé le</th>
+              <th>Dernière connexion</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (u of users(); track u.id) {
+              <tr [class.dimmed]="patchBusyId() === u.id">
+                <td>
+                  <div class="cell-user">
+                    <strong>{{ u.firstName }} {{ u.lastName }}</strong>
+                    <span class="email">{{ u.email }}</span>
+                  </div>
+                </td>
+                <td>
+                  <select
+                    class="role-select"
+                    [ngModel]="u.role"
+                    (ngModelChange)="onRoleChange(u, $event)"
+                    [disabled]="patchBusyId() === u.id">
+                    @for (opt of roleOptions; track opt.value) {
+                      <option [value]="opt.value">{{ opt.label }}</option>
+                    }
+                  </select>
+                </td>
+                <td>
+                  <label class="toggle">
+                    <input
+                      type="checkbox"
+                      [checked]="u.isActive"
+                      (change)="onActiveToggle(u, $any($event.target).checked)"
+                      [disabled]="patchBusyId() === u.id">
+                    <span class="sr-only">Compte actif</span>
+                  </label>
+                </td>
+                <td>{{ formatDate(u.createdAt) }}</td>
+                <td>{{ u.lastLoginAt ? formatDate(u.lastLoginAt) : '—' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <p class="table-meta">{{ usersTotal() }} utilisateur(s)</p>
+      @if (usersTotal() > 15) {
+        <div class="pager">
+          <button
+            type="button"
+            class="btn-link"
+            [disabled]="usersPage() <= 1"
+            (click)="applyUserFilters(usersPage() - 1)">
+            Précédent
+          </button>
+          <button
+            type="button"
+            class="btn-link"
+            [disabled]="usersPage() * 15 >= usersTotal()"
+            (click)="applyUserFilters(usersPage() + 1)">
+            Suivant
+          </button>
+        </div>
+      }
+    }
+  </section>
+
+  <section id="documents" class="panel">
+    <div class="panel__head">
+      <h2>Documents</h2>
+      <p class="lede">
+        Filtres avancés, tri, changement de statut ou suppression (fichier inclus).
+      </p>
+    </div>
+
+    <div class="filters-bar filters-bar--wrap">
+      <label class="filter-field">
+        <span>Titre</span>
+        <input
+          type="search"
+          [(ngModel)]="docFilterQ"
+          class="filter-input"
+          placeholder="Contient…">
+      </label>
+      <label class="filter-field">
+        <span>Statut</span>
+        <select [(ngModel)]="docFilterStatus" class="filter-input">
+          @for (opt of docStatusOptions; track opt.value) {
+            <option [value]="opt.value">{{ opt.label }}</option>
+          }
+        </select>
+      </label>
+      <label class="filter-field">
+        <span>Propriétaire</span>
+        <select [(ngModel)]="docFilterOwnerId" class="filter-input filter-input--wide">
+          <option value="">Tous</option>
+          @for (o of ownerOptions(); track o.id) {
+            <option [value]="o.id">{{ o.firstName }} {{ o.lastName }} — {{ o.email }}</option>
+          }
+        </select>
+      </label>
+      <label class="filter-field">
+        <span>Du</span>
+        <input type="date" [(ngModel)]="docFilterDateFrom" class="filter-input">
+      </label>
+      <label class="filter-field">
+        <span>Au</span>
+        <input type="date" [(ngModel)]="docFilterDateTo" class="filter-input">
+      </label>
+      <label class="filter-field">
+        <span>Tri</span>
+        <select [(ngModel)]="docSortBy" class="filter-input">
+          <option value="createdAt">Date</option>
+          <option value="title">Titre</option>
+          <option value="fileSize">Taille</option>
+        </select>
+      </label>
+      <label class="filter-field">
+        <span>Ordre</span>
+        <select [(ngModel)]="docSortOrder" class="filter-input">
+          <option value="DESC">Décroissant</option>
+          <option value="ASC">Croissant</option>
+        </select>
+      </label>
+      <button type="button" class="btn-filter" (click)="applyDocFilters(1)">
+        Appliquer
+      </button>
+    </div>
+
+    @if (documentsLoading()) {
+      <p class="muted">Chargement…</p>
+    } @else if (documents().length === 0) {
+      <p class="muted">Aucun document pour ces critères.</p>
+    } @else {
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Titre</th>
+              <th>Statut</th>
+              <th>Propriétaire</th>
+              <th>Taille</th>
+              <th>Signatures</th>
+              <th class="col-actions">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (d of documents(); track d.id) {
+              <tr [class.dimmed]="docActionBusyId() === d.id">
+                <td><strong>{{ d.title }}</strong></td>
+                <td>
+                  <select
+                    class="status-select"
+                    [ngModel]="d.status"
+                    (ngModelChange)="onDocumentStatusChange(d, $event)"
+                    [disabled]="docActionBusyId() === d.id">
+                    @for (opt of docStatusOptions; track opt.value) {
+                      @if (opt.value) {
+                        <option [value]="opt.value">{{ opt.label }}</option>
+                      }
+                    }
+                  </select>
+                </td>
+                <td>{{ d.owner.firstName }} {{ d.owner.lastName }}</td>
+                <td>{{ formatBytes(d.fileSize) }}</td>
+                <td>{{ d.signatures.length }}</td>
+                <td class="col-actions">
+                  <div class="action-stack">
+                    <button type="button" class="btn-link" (click)="openDocument(d.id)">Voir</button>
+                    <button type="button" class="btn-link" (click)="downloadDocument(d)">Télécharger</button>
+                    <button
+                      type="button"
+                      class="btn-link btn-link--danger"
+                      (click)="confirmDeleteDocument(d)"
+                      [disabled]="docActionBusyId() === d.id">
+                      Supprimer
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <p class="table-meta">{{ documentsTotal() }} document(s)</p>
+      @if (documentsTotal() > 15) {
+        <div class="pager">
+          <button
+            type="button"
+            class="btn-link"
+            [disabled]="documentsPage() <= 1"
+            (click)="applyDocFilters(documentsPage() - 1)">
+            Précédent
+          </button>
+          <button
+            type="button"
+            class="btn-link"
+            [disabled]="documentsPage() * 15 >= documentsTotal()"
+            (click)="applyDocFilters(documentsPage() + 1)">
+            Suivant
+          </button>
+        </div>
+      }
+    }
+  </section>
+
+  <section id="audit" class="panel">
+    <div class="panel__head">
+      <h2>Journal d’audit</h2>
+      <p class="lede">Filtrez par type d’action, utilisateur ou période.</p>
+    </div>
+
+    <div class="filters-bar filters-bar--wrap">
+      <label class="filter-field">
+        <span>Action</span>
+        <select [(ngModel)]="auditFilterAction" class="filter-input filter-input--wide">
+          @for (opt of auditActionOptions; track opt.value) {
+            <option [value]="opt.value">{{ opt.label }}</option>
+          }
+        </select>
+      </label>
+      <label class="filter-field">
+        <span>User ID</span>
+        <input
+          type="text"
+          [(ngModel)]="auditFilterUserId"
+          class="filter-input"
+          placeholder="UUID">
+      </label>
+      <label class="filter-field">
+        <span>Du</span>
+        <input type="date" [(ngModel)]="auditFilterDateFrom" class="filter-input">
+      </label>
+      <label class="filter-field">
+        <span>Au</span>
+        <input type="date" [(ngModel)]="auditFilterDateTo" class="filter-input">
+      </label>
+      <button type="button" class="btn-filter" (click)="applyAuditFilters(1)">
+        Appliquer
+      </button>
+    </div>
+
+    @if (auditLoading()) {
+      <p class="muted">Chargement…</p>
+    } @else {
+      <div class="table-wrap">
+        <table class="data-table data-table--compact">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Action</th>
+              <th>Utilisateur</th>
+              <th>Entité</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (a of auditItems(); track a.id) {
+              <tr>
+                <td>{{ formatDate(a.createdAt) }}</td>
+                <td>{{ auditActionLabel(a.action) }}</td>
+                <td class="mono">{{ a.userId ?? '—' }}</td>
+                <td>
+                  @if (a.entityType) {
+                    {{ a.entityType }}
+                    <span class="muted mono">{{ a.entityId }}</span>
+                  } @else {
+                    —
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <p class="table-meta">{{ auditTotal() }} entrée(s)</p>
+      @if (auditTotal() > 25) {
+        <div class="pager">
+          <button
+            type="button"
+            class="btn-link"
+            [disabled]="auditPage() <= 1"
+            (click)="applyAuditFilters(auditPage() - 1)">
+            Précédent
+          </button>
+          <button
+            type="button"
+            class="btn-link"
+            [disabled]="auditPage() * 25 >= auditTotal()"
+            (click)="applyAuditFilters(auditPage() + 1)">
+            Suivant
+          </button>
+        </div>
+      }
+    }
+  </section>
+</div>

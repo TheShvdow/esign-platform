@@ -1,0 +1,125 @@
+<div class="upload-section">
+  <div
+    class="upload-area"
+    [class.drag-over]="isDragOver()"
+    (dragover)="onDragOver($event)"
+    (dragleave)="onDragLeave($event)"
+    (drop)="onDrop($event)"
+    (click)="fileInput.click()">
+
+    @if (!selectedFile()) {
+      <div class="upload-placeholder">
+        <div class="upload-drop-figure" aria-hidden="true"></div>
+        <h3>Déposez votre fichier ici</h3>
+        <p>ou <span class="upload-link">choisissez un fichier</span> sur votre ordinateur</p>
+        <small>PDF, Word, JPG ou PNG — max. 10&nbsp;Mo</small>
+      </div>
+    } @else {
+      <div class="file-selected">
+        <div class="file-thumb" aria-hidden="true"></div>
+        <div class="file-info">
+          <h4>{{ selectedFile()?.name }}</h4>
+          <p>{{ formatFileSize(selectedFile()?.size || 0) }}</p>
+        </div>
+        <button type="button" class="remove-file" (click)="removeFile($event)" aria-label="Retirer le fichier">
+          ×
+        </button>
+      </div>
+    }
+  </div>
+
+  <input
+    #fileInput
+    type="file"
+    hidden
+    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+    (change)="onFileSelected($event)">
+
+  @if (selectedFile()) {
+    <div class="upload-form">
+      <div class="form-group">
+        <label for="title">Titre du document *</label>
+        <input
+          id="title"
+          type="text"
+          [(ngModel)]="documentTitle"
+          placeholder="Titre affiché dans la liste"
+          class="form-input"
+          required>
+      </div>
+
+      <div class="form-group">
+        <label for="description">Description (optionnel)</label>
+        <textarea
+          id="description"
+          [(ngModel)]="documentDescription"
+          placeholder="Contexte ou référence interne…"
+          rows="3"
+          class="form-textarea">
+        </textarea>
+      </div>
+
+      <div class="form-group workflow-section">
+        <h4 class="subsection-title">Signatures multiples & workflow</h4>
+        <label for="req-sig">Nombre de signatures attendues</label>
+        <input
+          id="req-sig"
+          type="number"
+          min="1"
+          [(ngModel)]="requiredSigCount"
+          class="form-input req-sig-input">
+
+        @if (directoryUsers().length > 0) {
+          <p class="hint-text">Co-signataires (parallèle si aucun workflow JSON) :</p>
+          <div class="participant-list">
+            @for (u of directoryUsers(); track u.id) {
+              <label class="participant-row">
+                <input
+                  type="checkbox"
+                  [checked]="selectedParticipantIds.includes(u.id)"
+                  (change)="toggleParticipant(u.id)">
+                <span>{{ u.firstName }} {{ u.lastName }}</span>
+                <span class="participant-role">{{ u.role }}</span>
+              </label>
+            }
+          </div>
+        }
+
+        <label for="wf-json">Workflow hiérarchique (JSON optionnel)</label>
+        <textarea
+          id="wf-json"
+          [(ngModel)]="workflowJsonAdvanced"
+          class="form-textarea workflow-json"
+          rows="6"
+          placeholder='Séquentiel par rôle (exemple) :&#10;{&#10;  "workflow": [&#10;    { "order": 1, "label": "Manager", "allowedRoles": ["MANAGER"] },&#10;    { "order": 2, "label": "Direction", "allowedRoles": ["DIRECTOR"] }&#10;  ]&#10;}'></textarea>
+        <small class="field-hint">
+          Ordre des étapes et rôles (MANAGER, DIRECTOR, etc.). Option <code>assigneeUserId</code> pour un signataire précis.
+        </small>
+      </div>
+
+      <div class="form-actions">
+        <button type="button" class="btn-secondary" (click)="cancelUpload()">
+          Annuler
+        </button>
+        <button type="button" class="btn-primary" [disabled]="!canUpload()" (click)="uploadDocument()">
+          Envoyer le document
+        </button>
+      </div>
+    </div>
+  }
+
+  @if (isUploading()) {
+    <div class="upload-progress">
+      <div class="progress-bar">
+        <div class="progress-fill" [style.width.%]="uploadProgress()"></div>
+      </div>
+      <p>Envoi en cours… {{ uploadProgress() }}%</p>
+    </div>
+  }
+
+  @if (errorMessage()) {
+    <div class="error-message" role="alert">
+      {{ errorMessage() }}
+    </div>
+  }
+</div>

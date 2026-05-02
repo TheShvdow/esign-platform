@@ -1,0 +1,228 @@
+<section class="document-detail">
+  @if (loadError()) {
+    <div class="error-banner">{{ loadError() }}</div>
+  }
+
+  @if (verificationBanner()) {
+    <div class="info-banner">{{ verificationBanner() }}</div>
+  }
+
+  @if (isLoading() && !document()) {
+    <div class="page-loading">
+      <div class="spinner"></div>
+      <p>Chargement du document…</p>
+    </div>
+  }
+
+  @if (document()) {
+  <header>
+    <div class="header-content">
+      <button type="button" class="back-btn" (click)="goBack()">
+        <span class="back-btn__icon" aria-hidden="true"></span>
+        Retour à la liste
+      </button>
+      <h1>{{ document()!.title }}</h1>
+      <div class="status-badge" [class]="'status-' + document()!.status">
+        {{ getStatusLabel(document()!.status) }}
+      </div>
+    </div>
+  </header>
+
+  <div class="content">
+    <div class="document-info">
+      <div class="info-card">
+        <h3>Informations générales</h3>
+        <dl>
+          <dt>Nom original :</dt>
+          <dd>{{ document()!.originalName }}</dd>
+
+          @if (document()!.description) {
+            <dt>Description :</dt>
+            <dd>{{ document()!.description }}</dd>
+          }
+
+          <dt>Type :</dt>
+          <dd>{{ document()!.mimeType }}</dd>
+
+          <dt>Taille :</dt>
+          <dd>{{ formatFileSize(document()!.fileSize) }}</dd>
+
+          <dt>Propriétaire :</dt>
+          <dd>{{ document()!.owner.firstName }} {{ document()!.owner.lastName }}</dd>
+
+          <dt>Créé le :</dt>
+          <dd>{{ formatDate(document()!.createdAt) }}</dd>
+
+          <dt>Hash :</dt>
+          <dd class="hash">{{ document()!.fileHash }}</dd>
+        </dl>
+      </div>
+
+      @if (document()!.workflowSummary) {
+        <div class="workflow-card">
+          <h3>Flux de signature</h3>
+          <p class="workflow-lead">
+            <strong>{{ document()!.workflowSummary!.mode === 'sequential' ? 'Séquentiel' : 'Parallèle' }}</strong>
+            — {{ document()!.workflowSummary!.signaturesCompleted }} / {{ document()!.workflowSummary!.stepsTotal }} signature(s)
+          </p>
+          @if (document()!.metadata?.workflow?.length) {
+            <ol class="workflow-steps">
+              @for (step of document()!.metadata!.workflow; track step.order) {
+                <li>
+                  <span class="step-title">Étape {{ step.order }}</span>
+                  @if (step.label) {
+                    <span> — {{ step.label }}</span>
+                  }
+                  @if (step.assigneeUserId) {
+                    <span class="step-meta"> (utilisateur assigné)</span>
+                  }
+                  @if (step.allowedRoles?.length) {
+                    <span class="step-meta"> — rôles autorisés : {{ step.allowedRoles!.join(', ') }}</span>
+                  }
+                </li>
+              }
+            </ol>
+          }
+        </div>
+      }
+
+      <div class="actions-card">
+        <h3>Actions</h3>
+        <div class="actions">
+          <button
+            type="button"
+            class="btn-primary"
+            [disabled]="actionBusy()"
+            (click)="downloadDocument()">
+            Télécharger le PDF
+          </button>
+
+          <button
+            type="button"
+            class="btn-secondary"
+            [disabled]="actionBusy() || !canSign()"
+            (click)="openSignatureModal()">
+            Signer le document
+          </button>
+
+          <button
+            type="button"
+            class="btn-outline"
+            [disabled]="actionBusy()"
+            (click)="verifySignatures()">
+            Vérifier les signatures
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="signatures-section">
+      <h3>Signatures ({{ document()!.signatures.length }})</h3>
+
+      @if (document()!.signatures.length) {
+        <div class="signatures-list">
+          @for (signature of document()!.signatures; track signature.id) {
+            <div class="signature-card" [class.valid]="signature.isValid" [class.invalid]="!signature.isValid">
+              <div class="signature-header">
+                <div class="signer-info">
+                  <strong>{{ signature.signer.firstName }} {{ signature.signer.lastName }}</strong>
+                  <small>{{ signature.signer.email }}</small>
+                </div>
+                <div class="signature-status">
+                  @if (signature.isValid) {
+                    <span class="status-valid status-pill status-pill--ok">Valide</span>
+                  } @else {
+                    <span class="status-invalid status-pill status-pill--bad">Invalide</span>
+                  }
+                </div>
+              </div>
+
+              <div class="signature-details">
+                <div class="signature-meta">
+                  Type {{ signature.type }} · Certificat {{ signature.certificateId }}
+                </div>
+                <div class="signature-date">
+                  Signé le {{ formatDate(signature.createdAt) }}
+                </div>
+              </div>
+
+              @if (signature.validationErrors) {
+                <div class="validation-errors">
+                  {{ signature.validationErrors }}
+                </div>
+              }
+            </div>
+          }
+        </div>
+      } @else {
+        <p class="no-signatures">Aucune signature pour le moment.</p>
+      }
+    </div>
+  </div>
+  }
+
+  @if (showSignatureModal()) {
+    <div class="modal-overlay" (click)="closeSignatureModal()">
+      <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3>Signer le document</h3>
+          <button type="button" class="close-btn" (click)="closeSignatureModal()">×</button>
+        </div>
+        <div class="modal-body">
+          <p class="modal-lead">Document : <strong>{{ document()?.title }}</strong></p>
+
+          @if (signError()) {
+            <div class="sign-error">{{ signError() }}</div>
+          }
+
+          <div class="form-field">
+            <label for="sig-type">Type de signature</label>
+            <select id="sig-type" class="form-input" [(ngModel)]="signatureType">
+              <option [ngValue]="SignatureType.SIMPLE">Simple</option>
+              <option [ngValue]="SignatureType.ADVANCED">Avancée</option>
+              <option [ngValue]="SignatureType.QUALIFIED">Qualifiée</option>
+            </select>
+          </div>
+
+          <div class="form-field">
+            <label for="cert-id">Identifiant du certificat</label>
+            <input
+              id="cert-id"
+              type="text"
+              class="form-input"
+              [(ngModel)]="certificateId"
+              placeholder="ex. cert-dev-1"
+              autocomplete="off">
+            <small class="field-hint">Utilisé par le backend (simulation HSM) pour récupérer la clé.</small>
+          </div>
+
+          <div class="form-field">
+            <label for="sig-reason">Motif (optionnel)</label>
+            <textarea
+              id="sig-reason"
+              class="form-textarea"
+              rows="2"
+              [(ngModel)]="signReason"
+              placeholder="Ex. Approbation du contrat"></textarea>
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" class="btn-outline" (click)="closeSignatureModal()">Annuler</button>
+            <button
+              type="button"
+              class="btn-secondary"
+              [disabled]="!certificateId.trim() || signingInProgress()"
+              (click)="submitSign()">
+              @if (signingInProgress()) {
+                Signature…
+              } @else {
+                Confirmer la signature
+              }
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+</section>
+  

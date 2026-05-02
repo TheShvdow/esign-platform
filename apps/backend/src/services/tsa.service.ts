@@ -18,12 +18,13 @@ export class TSAService {
 
       return forge.util.encode64(tsResponse);
     } catch (error) {
-      console.warn('TSA request failed, using local timestamp:', error.message);
+      const message = error instanceof Error ? error.message : 'Unexpected error';
+      console.warn('TSA request failed, using local timestamp:', message);
       return forge.util.encode64(`local-timestamp-${Date.now()}-${hash}`);
     }
   }
 
-  private createCustomTimeStampQuery(hash: string): any {
+  private createCustomTimeStampQuery(hash: string): TimeStampQuery {
     // Implémentation personnalisée d'une requête TSA
     // En attendant que node-forge supporte createTimeStampQuery
     return {
@@ -36,4 +37,14 @@ export class TSAService {
       certReq: true,
     };
   }
+}
+
+interface TimeStampQuery {
+  messageImprint: {
+    hashAlgorithm: string;
+    hashedMessage: string;
+  };
+  reqPolicy?: string;
+  nonce: string;
+  certReq: boolean;
 }

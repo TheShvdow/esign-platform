@@ -7,6 +7,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { Document } from '../entities/document.entity';
+import { Signature } from '../entities/signature.entity';
 import { User } from '../entities/user.entity';
 import {
   CreateDocumentDto,
@@ -22,6 +23,7 @@ import { FileValidationService } from './file-validation.service';
 import { DocumentMapperService } from './document-mapper.service';
 import { PermissionService } from './permission.service';
 import { SignatureCreationService } from './signature-creation.service';
+import { SignedPdfAnnexService } from './signed-pdf-annex.service';
 
 @Injectable()
 export class DocumentService {
@@ -37,6 +39,7 @@ export class DocumentService {
     private documentMapper: DocumentMapperService,
     private permissionService: PermissionService,
     private signatureCreationService: SignatureCreationService,
+    private signedPdfAnnexService: SignedPdfAnnexService,
   ) {}
 
   async create(
@@ -68,6 +71,14 @@ export class DocumentService {
 
     const savedDocument = await this.documentRepository.save(document);
 
+    const documentWithRelations = await this.documentRepository.findOne({
+      where: { id: savedDocument.id },
+      relations: ['owner', 'signatures', 'signatures.signer'],
+    });
+    if (!documentWithRelations) {
+      throw new NotFoundException('Document could not be loaded after upload');
+    }
+
     await this.auditService.log({
       action: AuditAction.DOCUMENT_UPLOAD,
       userId: user.id,
@@ -81,11 +92,11 @@ export class DocumentService {
     });
 
     this.eventEmitter.emit('document.created', {
-      document: savedDocument,
+      document: documentWithRelations,
       user,
     });
 
-    return this.documentMapper.toDto(savedDocument);
+    return this.documentMapper.toDto(documentWithRelations, user);
   }
 
   async findAll(
@@ -115,10 +126,34 @@ export class DocumentService {
       .getManyAndCount();
 
     return {
-      documents: this.documentMapper.toDtoList(documents),
+      documents: this.documentMapper.toDtoList(documents, user),
       total,
       page,
       limit,
+    };
+  }
+
+  async getDownloadFile(
+    id: string,
+    user: User,
+  ): Promise<{ buffer: Buffer; fileName: string; mimeType: string }> {
+    const document = await this.documentRepository.findOne({
+      where: { id },
+      relations: ['signatures', 'signatures.signer', 'owner'],
+    });
+    if (!document) {
+      throw new NotFoundException('Document not found');
+    }
+    this.permissionService.checkDocumentAccess(document, user);
+    let buffer = await this.retrieveFile(document.storageKey, id);
+    buffer = await this.signedPdfAnnexService.embedAnnexForSignedPdf(
+      buffer,
+      document,
+    );
+    return {
+      buffer,
+      fileName: document.originalName,
+      mimeType: document.mimeType,
     };
   }
 
@@ -133,7 +168,7 @@ export class DocumentService {
     }
 
     this.permissionService.checkDocumentAccess(document, user);
-    return this.documentMapper.toDto(document);
+    return this.documentMapper.toDto(document, user);
   }
 
   async signDocument(
@@ -178,7 +213,7 @@ export class DocumentService {
     await this.logSignatureAudit(updatedDocument, user, signDto);
     this.emitSignatureEvent(updatedDocument, user);
 
-    return this.documentMapper.toDto(updatedDocument);
+    return this.documentMapper.toDto(updatedDocument, user);
   }
 
   async verifyDocument(
@@ -239,7 +274,7 @@ export class DocumentService {
   }
 
   private validateDocumentForSigning(document: Document, user: User): void {
-    if (!document.canBeSignedBy(user.id)) {
+    if (!document.canBeSignedBy(user)) {
       throw new BadRequestException('Document cannot be signed by this user');
     }
 
@@ -257,7 +292,9 @@ export class DocumentService {
     try {
       return await this.storageService.retrieve(storageKey);
     } catch (error) {
-      throw new NotFoundException(`File not found for document ${documentId}: ${error.message}`);
+      throw new NotFoundException(
+        `File not found for document ${documentId}: ${this.getErrorMessage(error)}`,
+      );
     }
   }
 
@@ -271,8 +308,8 @@ export class DocumentService {
         certificateId: signDto.certificateId,
         signatureType: signDto.signatureType,
       });
-    } catch (error) {
-      throw new BadRequestException(`Failed to sign document: ${error.message}`);
+    } catch (error: unknown) {
+      throw new BadRequestException(`Failed to sign document: ${this.getErrorMessage(error)}`);
     }
   }
 
@@ -290,28 +327,38 @@ export class DocumentService {
     await queryRunner.startTransaction();
 
     try {
-      await this.signatureCreationService.createInTransaction(
+      const newSignature = await this.signatureCreationService.createInTransaction(
         queryRunner,
         document,
         user,
         signDto,
         signatureResult,
         request,
-        isValid, // ✅ Bug 2 Fix: Passer la valeur vérifiée
-        validationErrors, // ✅ Bug 2 Fix: Passer les erreurs de validation
+        isValid,
+        validationErrors,
       );
 
+      if (!document.signatures) {
+        document.signatures = [];
+      }
+      document.signatures.push(newSignature);
       document.updateStatusBasedOnSignatures();
       await queryRunner.manager.save(Document, document);
       await queryRunner.commitTransaction();
 
-      return await this.documentRepository.findOne({
+      const updatedDocument = await this.documentRepository.findOne({
         where: { id: document.id },
         relations: ['owner', 'signatures', 'signatures.signer'],
       });
-    } catch (error) {
+      if (!updatedDocument) {
+        throw new NotFoundException(`Signed document ${document.id} could not be reloaded`);
+      }
+      return updatedDocument;
+    } catch (error){
       await queryRunner.rollbackTransaction();
-      throw new BadRequestException(`Failed to save signature: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to save signature: ${this.getErrorMessage(error)}`,
+      );
     } finally {
       await queryRunner.release();
     }
@@ -325,7 +372,7 @@ export class DocumentService {
   }
 
   private async verifyAllSignatures(
-    signatures: any[],
+    signatures: Signature[],
     originalFile: Buffer,
   ): Promise<Array<{ signatureId: string; isValid: boolean; errors?: string[] }>> {
     return Promise.all(
@@ -346,11 +393,23 @@ export class DocumentService {
           return {
             signatureId: signature.id,
             isValid: false,
-            errors: [`Verification error: ${error.message}`],
+            errors: [`Verification error: ${this.getErrorMessage(error)}`],
           };
         }
       }),
     );
+  }
+
+  private getErrorMessage(error: unknown): string {
+    if (error instanceof Error) {
+      return error.message;
+    }
+
+    if (typeof error === 'string') {
+      return error;
+    }
+
+    return 'Unexpected error';
   }
 
   private async logSignatureAudit(

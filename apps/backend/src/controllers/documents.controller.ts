@@ -11,6 +11,7 @@ import {
   Query,
   Request,
   ParseUUIDPipe,
+  StreamableFile,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
@@ -28,6 +29,7 @@ import {
 } from '../dto/document.dto';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { RolesGuard } from '../guards/roles.guard';
+import { AuthenticatedRequest, DocumentVerificationResult } from '../types/global.types';
 
 @ApiTags('Documents')
 @Controller('documents')
@@ -48,7 +50,7 @@ export class DocumentsController {
   async create(
     @Body() createDocumentDto: CreateDocumentDto,
     @UploadedFile() file: Express.Multer.File,
-    @Request() req,
+    @Request() req: AuthenticatedRequest,
   ): Promise<DocumentDto> {
     return this.documentService.create(createDocumentDto, file, req.user);
   }
@@ -59,9 +61,38 @@ export class DocumentsController {
   async findAll(
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 10,
-    @Request() req,
-  ) {
+    @Request() req: AuthenticatedRequest,
+  ): Promise<{
+    documents: DocumentDto[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
     return this.documentService.findAll(req.user, page, limit);
+  }
+
+  @Get(':id/download')
+  @ApiOperation({
+    summary: 'Download file',
+    description:
+      'Fichier stocké. Pour les PDF signés, une dernière page est ajoutée (certificat de signature : signataires, certificat, intégrité).',
+  })
+  @ApiResponse({ status: 200, description: 'File stream' })
+  @ApiResponse({ status: 404, description: 'Document not found' })
+  async download(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Request() req: AuthenticatedRequest,
+  ): Promise<StreamableFile> {
+    const { buffer, fileName, mimeType } = await this.documentService.getDownloadFile(
+      id,
+      req.user,
+    );
+    const safeAscii = fileName.replace(/[^\x20-\x7E]/g, '_');
+    const encodedUtf8 = encodeURIComponent(fileName);
+    return new StreamableFile(buffer, {
+      type: mimeType,
+      disposition: `attachment; filename="${safeAscii}"; filename*=UTF-8''${encodedUtf8}`,
+    });
   }
 
   @Get(':id')
@@ -74,7 +105,7 @@ export class DocumentsController {
   @ApiResponse({ status: 404, description: 'Document not found' })
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
-    @Request() req,
+    @Request() req: AuthenticatedRequest,
   ): Promise<DocumentDto> {
     return this.documentService.findById(id, req.user);
   }
@@ -90,7 +121,7 @@ export class DocumentsController {
   async signDocument(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() signDto: SignDocumentDto,
-    @Request() req,
+    @Request() req: AuthenticatedRequest,
   ): Promise<DocumentDto> {
     return this.documentService.signDocument(id, signDto, req.user, req);
   }
@@ -98,7 +129,10 @@ export class DocumentsController {
   @Post(':id/verify')
   @ApiOperation({ summary: 'Verify document signatures' })
   @ApiResponse({ status: 200, description: 'Document verification completed' })
-  async verifyDocument(@Param('id', ParseUUIDPipe) id: string, @Request() req) {
+  async verifyDocument(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Request() req: AuthenticatedRequest,
+  ): Promise<DocumentVerificationResult> {
     return this.documentService.verifyDocument(id, req.user);
   }
 }

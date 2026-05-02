@@ -1,8 +1,11 @@
 // src/types/user.types.ts
 
 export enum UserRole {
-  USER = 'USER',
   ADMIN = 'ADMIN',
+  DIRECTOR = 'DIRECTOR',
+  MANAGER = 'MANAGER',
+  VALIDATOR = 'VALIDATOR',
+  USER = 'USER',
 }
 
 export interface SecurityContext {

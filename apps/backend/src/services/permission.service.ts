@@ -7,12 +7,33 @@ import { UserRole } from '../types/global.types';
 @Injectable()
 export class PermissionService {
   checkDocumentAccess(document: Document, user: User): void {
-    if (document.ownerId !== user.id && !user.hasRole(UserRole.ADMIN)) {
-      throw new ForbiddenException('Access denied');
+    if (user.hasRole(UserRole.ADMIN)) {
+      return;
     }
+    if (document.ownerId === user.id) {
+      return;
+    }
+    const meta = document.metadata;
+    if (meta?.participantUserIds?.includes(user.id)) {
+      return;
+    }
+    if (meta?.workflow?.some((s) => s.assigneeUserId === user.id)) {
+      return;
+    }
+    if (
+      meta?.workflow?.some((s) => s.allowedRoles?.includes(user.role))
+    ) {
+      return;
+    }
+    throw new ForbiddenException('Access denied');
   }
 
   canUserAccessDocument(document: Document, user: User): boolean {
-    return document.ownerId === user.id || user.hasRole(UserRole.ADMIN);
+    try {
+      this.checkDocumentAccess(document, user);
+      return true;
+    } catch {
+      return false;
+    }
   }
 }

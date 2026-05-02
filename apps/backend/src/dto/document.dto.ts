@@ -6,13 +6,25 @@ import {
   IsEnum,
   ValidateNested
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
-import { DocumentStatus, SignatureType } from '../types/global.types';
+import { DocumentMetadata, DocumentStatus, SignatureAdditionalMetadata, SignatureType } from '../types/global.types';
 import { UserDto } from './auth.dto';
 
 export class CreateDocumentDto {
-  @ApiProperty({ 
+  constructor(
+    title: string,
+    description?: string,
+    expiresAt?: Date,
+    metadata?: DocumentMetadata,
+  ) {
+    this.title = title;
+    this.description = description;
+    this.expiresAt = expiresAt;
+    this.metadata = metadata;
+  }
+
+  @ApiProperty({
     example: 'Contract Agreement',
     description: 'Title of the document'
   })
@@ -39,23 +51,54 @@ export class CreateDocumentDto {
   expiresAt?: Date;
 
   @ApiProperty({ 
-    description: 'Additional metadata for the document',
-    example: { requiredSignatures: 2, department: 'legal' },
+    description:
+      'Métadonnées JSON : requiredSignatures, participantUserIds, workflow (étapes hiérarchiques). Peut être envoyée comme chaîne JSON en multipart.',
+    example: {
+      requiredSignatures: 2,
+      participantUserIds: [],
+      workflow: [
+        { order: 1, allowedRoles: ['MANAGER'], label: 'Manager' },
+        { order: 2, allowedRoles: ['DIRECTOR'], label: 'Direction' },
+      ],
+    },
     required: false
   })
   @IsOptional()
-  metadata?: Record<string, any>;
+  @Transform(({ value }) => {
+    if (value === undefined || value === null || value === '') {
+      return undefined;
+    }
+    if (typeof value === 'string') {
+      try {
+        return JSON.parse(value) as DocumentMetadata;
+      } catch {
+        return undefined;
+      }
+    }
+    return value;
+  })
+  metadata?: DocumentMetadata;
 }
 
 export class SignDocumentDto {
-  @ApiProperty({ 
+  constructor(
+    signatureType: SignatureType,
+    certificateId: string,
+    additionalMetadata?: SignatureAdditionalMetadata,
+  ) {
+    this.signatureType = signatureType;
+    this.certificateId = certificateId;
+    this.additionalMetadata = additionalMetadata;
+  }
+
+  @ApiProperty({
     enum: SignatureType,
     description: 'Type of electronic signature'
   })
   @IsEnum(SignatureType)
   signatureType: SignatureType;
 
-  @ApiProperty({ 
+  @ApiProperty({
     example: 'cert-123',
     description: 'Certificate ID used for signing'
   })
@@ -68,33 +111,80 @@ export class SignDocumentDto {
     required: false
   })
   @IsOptional()
-  additionalMetadata?: Record<string, any>;
+  additionalMetadata?: SignatureAdditionalMetadata;
 }
 
 export class SignatureDto {
-  @ApiProperty({ description: 'Unique signature identifier' })
-  id: string;
+  constructor(
+    id: string,
+    type: SignatureType,
+    certificateId: string,
+    isValid: boolean,
+    createdAt: Date,
+    signer: UserDto,
+  ) {
+    this.id = id;
+    this.type = type;
+    this.certificateId = certificateId;
+    this.isValid = isValid;
+    this.createdAt = createdAt;
+    this.signer = signer;
+  }
 
-  @ApiProperty({ 
+  @ApiProperty({ description: 'Unique signature identifier' })
+  id!: string;
+
+  @ApiProperty({
     enum: SignatureType,
     description: 'Type of signature applied'
   })
-  type: SignatureType;
+  type!: SignatureType;
 
   @ApiProperty({ description: 'Certificate ID used for this signature' })
-  certificateId: string;
+  certificateId!: string;
 
   @ApiProperty({ description: 'Whether the signature is valid' })
-  isValid: boolean;
+  isValid!: boolean;
 
   @ApiProperty({ description: 'Signature creation timestamp' })
-  createdAt: Date;
+  createdAt!: Date;
 
   @ApiProperty({ description: 'User who created this signature' })
-  signer: UserDto;
+  signer!: UserDto;
 }
 
 export class DocumentDto {
+  constructor(
+    id: string,
+    title: string,
+    fileName: string,
+    originalName: string,
+    mimeType: string,
+    fileSize: number,
+    fileHash: string,
+    status: DocumentStatus,
+    createdAt: Date,
+    updatedAt: Date,
+    owner: UserDto,
+    signatures: SignatureDto[],
+    description?: string,
+    expiresAt?: Date,
+  ) {
+    this.id = id;
+    this.title = title;
+    this.fileName = fileName;
+    this.originalName = originalName;
+    this.mimeType = mimeType;
+    this.fileSize = fileSize;
+    this.fileHash = fileHash;
+    this.status = status;
+    this.createdAt = createdAt;
+    this.updatedAt = updatedAt;
+    this.owner = owner;
+    this.signatures = signatures;
+    this.description = description;
+    this.expiresAt = expiresAt;
+  }
   @ApiProperty({ description: 'Unique document identifier' })
   id: string;
 
@@ -142,4 +232,26 @@ export class DocumentDto {
     description: 'List of signatures applied to this document'
   })
   signatures: SignatureDto[];
+
+  @ApiProperty({
+    required: false,
+    description: 'Workflow, participants, etc.',
+  })
+  metadata?: DocumentMetadata;
+
+  @ApiProperty({
+    required: false,
+    description: 'Résumé du flux de signature pour l’interface',
+  })
+  workflowSummary?: {
+    mode: 'sequential' | 'parallel';
+    stepsTotal: number;
+    signaturesCompleted: number;
+  };
+
+  @ApiProperty({
+    required: false,
+    description: "True si l'utilisateur courant peut signer maintenant (renseigné côté API).",
+  })
+  maySign?: boolean;
 }

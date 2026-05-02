@@ -7,6 +7,7 @@ import * as bcrypt from 'bcryptjs';
 import { User } from '../entities/user.entity';
 import { LoginDto, RegisterDto, AuthResponseDto } from '../dto/auth.dto';
 import { UserRole } from '../types/global.types';
+import { JwtPayload } from '../types/request.types';
 
 @Injectable()
 export class AuthService {
@@ -61,7 +62,7 @@ export class AuthService {
   }
 
   async register(registerDto: RegisterDto): Promise<AuthResponseDto> {
-    const { email, password, firstName, lastName, role } = registerDto;
+    const { email, password, firstName, lastName } = registerDto;
 
     // Vérifier si l'utilisateur existe déjà
     const existingUser = await this.userRepository.findOne({
@@ -81,7 +82,7 @@ export class AuthService {
       firstName,
       lastName,
       passwordHash,
-      role: role || UserRole.USER, // ✅ Utiliser USER par défaut si non spécifié
+      role: UserRole.USER,
       isActive: true,
       emailVerified: false,
       mfaEnabled: false,
@@ -121,7 +122,7 @@ export class AuthService {
     console.log(`User ${userId} logged out`);
   }
 
-  async validateUser(payload: any): Promise<User | null> {
+  async validateUser(payload: JwtPayload): Promise<User | null> {
     const user = await this.userRepository.findOne({
       where: { id: payload.sub },
     });

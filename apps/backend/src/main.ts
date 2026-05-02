@@ -3,23 +3,23 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import helmet from 'helmet';
+import compression from 'compression';
+import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // Security middlewares - ✅ Import direct pour éviter les conflits de versions
-  const helmet = require('helmet');
-  const compression = require('compression');
-    
   app.use(helmet());
   app.use(compression());
 
   // CORS configuration
   app.enableCors({
-    origin: process.env.CORS_ORIGINS?.split(',') || ['http://localhost:3000'],
+    origin: process.env.CORS_ORIGINS?.split(',') || ['http://localhost:3000', 'http://localhost:4200'],
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    
   });
 
   // Global validation pipe
@@ -31,6 +31,7 @@ async function bootstrap() {
       enableImplicitConversion: true
     }
   }));
+  app.useGlobalFilters(new HttpExceptionFilter());
 
   // API documentation - ✅ Simplification pour éviter les conflits de versions
   const config = new DocumentBuilder()
@@ -40,9 +41,8 @@ async function bootstrap() {
     .addBearerAuth()
     .build();
     
-  // ✅ Cast explicite pour éviter les erreurs de compatibilité de versions
-  const document = SwaggerModule.createDocument(app as any, config);
-  SwaggerModule.setup('api', app as any, document);
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api', app, document);
 
   const port = process.env.PORT || 3000;
   await app.listen(port);
@@ -51,7 +51,7 @@ async function bootstrap() {
   console.log(`📚 API Documentation: http://localhost:${port}/api`);
 }
 
-bootstrap().catch(err => {
-  console.error('Error starting application:', err);
+bootstrap().catch((err) => {
+  console.error('Error starting application:', err instanceof Error ? err.message : err);
   process.exit(1);
 });
