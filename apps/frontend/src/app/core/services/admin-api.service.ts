@@ -4,6 +4,7 @@ import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import {
   AdminAuditResponse,
+  AdminCreateUserPayload,
   AdminPlatformStats,
   AdminUpdateUserPayload,
   AdminUserRow,
@@ -91,6 +92,10 @@ export class AdminApiService {
     payload: AdminUpdateUserPayload,
   ): Observable<AdminUserRow> {
     return this.http.patch<AdminUserRow>(`${this.base}/users/${id}`, payload);
+  }
+
+  createUser(payload: AdminCreateUserPayload): Observable<AdminUserRow> {
+    return this.http.post<AdminUserRow>(`${this.base}/users`, payload);
   }
 
   getAudit(filters: {

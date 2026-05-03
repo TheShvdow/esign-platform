@@ -1,5 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsEnum, IsOptional } from 'class-validator';
+import {
+  IsBoolean,
+  IsEmail,
+  IsEnum,
+  IsOptional,
+  IsString,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 import { UserRole, DocumentStatus } from '../types/global.types';
 import type { DocumentDto } from './document.dto';
 
@@ -48,6 +56,54 @@ export interface AdminDocumentsListResponseDto {
   total: number;
   page: number;
   limit: number;
+}
+
+export class AdminCreateUserDto {
+  @ApiProperty({
+    example: 'marie.dupont@example.com',
+    description: 'Adresse e-mail du nouvel utilisateur',
+  })
+  @IsEmail({}, { message: 'Veuillez fournir une adresse e-mail valide' })
+  email!: string;
+
+  @ApiProperty({
+    example: 'Marie',
+    description: 'Prénom',
+  })
+  @IsString()
+  @MinLength(2)
+  @MaxLength(50)
+  firstName!: string;
+
+  @ApiProperty({
+    example: 'Dupont',
+    description: 'Nom',
+  })
+  @IsString()
+  @MinLength(2)
+  @MaxLength(50)
+  lastName!: string;
+
+  @ApiProperty({
+    example: 'Motdepasse123',
+    description: 'Mot de passe initial',
+    minLength: 8,
+    maxLength: 128,
+  })
+  @IsString()
+  @MinLength(8)
+  @MaxLength(128)
+  password!: string;
+
+  @ApiProperty({
+    enum: UserRole,
+    example: UserRole.USER,
+    description: 'Rôle utilisateur',
+    required: false,
+  })
+  @IsOptional()
+  @IsEnum(UserRole)
+  role?: UserRole;
 }
 
 export interface AdminUserRowDto {

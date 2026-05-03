@@ -1,10 +1,7 @@
-version: '3.8'
-
 services:
-  # Backend API
   backend:
     build:
-      context: .
+      context: ..
       dockerfile: docker/backend.Dockerfile
       target: builder
     ports:
@@ -12,9 +9,9 @@ services:
     environment:
       - NODE_ENV=development
     env_file:
-      - apps/backend/.env.development
+      - ../apps/backend/.env.development
     volumes:
-      - ./apps/backend:/app/apps/backend
+      - ../apps/backend:/app/apps/backend
       - /app/apps/backend/node_modules
     depends_on:
       - postgres
@@ -23,7 +20,6 @@ services:
       - esign-network
     command: npm run start:dev
 
-  # PostgreSQL Database
   postgres:
     image: postgres:15-alpine
     environment:
@@ -34,11 +30,10 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ../scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - esign-network
 
-  # Redis Cache
   redis:
     image: redis:7-alpine
     ports:
@@ -49,7 +44,6 @@ services:
       - esign-network
     command: redis-server --appendonly yes
 
-  # Adminer (DB Admin)
   adminer:
     image: adminer:latest
     ports:
@@ -59,25 +53,25 @@ services:
     networks:
       - esign-network
 
-  # Future Frontend (préparé)
   frontend:
     build:
-      context: .
+      context: ..
       dockerfile: docker/frontend.Dockerfile
+      target: dev
     ports:
       - "3000:3000"
     environment:
       - NODE_ENV=development
-      - NEXT_PUBLIC_API_URL=http://localhost:3001
+      - API_URL=http://localhost:3001
     volumes:
-      - ./apps/frontend:/app
-      - /app/node_modules
+      - ../apps/frontend:/app/apps/frontend
+      - /app/apps/frontend/node_modules
     depends_on:
       - backend
     networks:
       - esign-network
     profiles:
-      - frontend # Activé seulement avec --profile frontend
+      - frontend
 
 volumes:
   postgres_data:

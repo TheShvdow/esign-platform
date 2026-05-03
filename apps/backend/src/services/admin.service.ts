@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository, MoreThan } from 'typeorm';
+import * as bcrypt from 'bcryptjs';
 import { User } from '../entities/user.entity';
 import { Document } from '../entities/document.entity';
 import { Signature } from '../entities/signature.entity';
@@ -332,6 +333,62 @@ export class AdminService {
     }));
 
     return { users, total, page: safePage, limit: safeLimit };
+  }
+
+  async createUser(
+    dto: {
+      email: string;
+      firstName: string;
+      lastName: string;
+      password: string;
+      role?: UserRole;
+    },
+    actor: User,
+  ): Promise<AdminUserRowDto> {
+    const existing = await this.userRepository.findOne({
+      where: { email: dto.email },
+    });
+
+    if (existing) {
+      throw new BadRequestException('Un utilisateur existe déjà avec ce courriel.');
+    }
+
+    const passwordHash = await bcrypt.hash(dto.password, 12);
+    const user = this.userRepository.create({
+      email: dto.email,
+      firstName: dto.firstName,
+      lastName: dto.lastName,
+      role: dto.role ?? UserRole.USER,
+      passwordHash,
+      isActive: true,
+      emailVerified: false,
+      mfaEnabled: false,
+    });
+
+    const saved = await this.userRepository.save(user);
+
+    await this.auditService.log({
+      action: AuditAction.USER_REGISTER,
+      userId: actor.id,
+      entityType: 'User',
+      entityId: saved.id,
+      details: {
+        role: saved.role,
+      } as AuditDetails,
+    });
+
+    return {
+      id: saved.id,
+      email: saved.email,
+      firstName: saved.firstName,
+      lastName: saved.lastName,
+      role: saved.role,
+      isActive: saved.isActive,
+      emailVerified: saved.emailVerified,
+      mfaEnabled: saved.mfaEnabled,
+      createdAt: saved.createdAt.toISOString(),
+      lastLoginAt: saved.lastLoginAt ? saved.lastLoginAt.toISOString() : null,
+    };
   }
 
   async updateUser(

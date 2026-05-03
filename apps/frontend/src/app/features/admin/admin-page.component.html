@@ -337,7 +337,7 @@
                     <button
                       type="button"
                       class="btn-link btn-link--danger"
-                      (click)="confirmDeleteDocument(d)"
+                      (click)="openDeleteDocumentModal(d)"
                       [disabled]="docActionBusyId() === d.id">
                       Supprimer
                     </button>
@@ -489,7 +489,7 @@
       <nav class="sidebar-nav">
         <div class="nav-group">
           <span class="nav-group-label">Vue d'ensemble</span>
-          <a class="nav-item" [class.active]="activeSection() === 'insights'" (click)="setSection('insights')" href="#insights">
+          <a class="nav-item" [class.active]="activeSection() === 'insights'" [routerLink]="['/admin']" (click)="setSection('insights')">
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
               <rect x="3" y="3" width="7" height="7" rx="1.5"/>
               <rect x="14" y="3" width="7" height="7" rx="1.5"/>
@@ -502,7 +502,7 @@
 
         <div class="nav-group">
           <span class="nav-group-label">Gestion</span>
-          <a class="nav-item" [class.active]="activeSection() === 'users'" (click)="setSection('users')" href="#users">
+          <a class="nav-item" [class.active]="activeSection() === 'users'" [routerLink]="['/admin','user']" (click)="setSection('users')">
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
               <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
               <circle cx="9" cy="7" r="4"/>
@@ -513,7 +513,7 @@
               <span class="nav-badge">{{ s.users.total }}</span>
             }
           </a>
-          <a class="nav-item" [class.active]="activeSection() === 'documents'" (click)="setSection('documents')" href="#documents">
+          <a class="nav-item" [class.active]="activeSection() === 'documents'" [routerLink]="['/admin','document']" (click)="setSection('documents')">
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
               <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
               <polyline points="14,2 14,8 20,8"/>
@@ -525,7 +525,7 @@
               <span class="nav-badge">{{ s.documents.total }}</span>
             }
           </a>
-          <a class="nav-item" [class.active]="activeSection() === 'audit'" (click)="setSection('audit')" href="#audit">
+          <a class="nav-item" [class.active]="activeSection() === 'audit'" [routerLink]="['/admin','audit']" (click)="setSection('audit')">
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
               <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
               <rect x="9" y="3" width="6" height="4" rx="1"/>
@@ -804,6 +804,76 @@
           <div>
             <h2 class="section-title">Utilisateurs &amp; privilèges</h2>
             <p class="section-sub">Gérez les rôles et statuts de chaque compte.</p>
+          </div>
+          <button
+            type="button"
+            class="btn-primary"
+            (click)="setSection('users')">
+            Créer un utilisateur
+          </button>
+        </div>
+
+        @if (createUserError()) {
+          <div class="banner banner--error">{{ createUserError() }}</div>
+        }
+        @if (createUserSuccess()) {
+          <div class="banner banner--success">{{ createUserSuccess() }}</div>
+        }
+
+        <div class="create-user-card">
+          <div class="card-header">
+            <div>
+              <h3>Créer un utilisateur</h3>
+              <p class="card-sub">Ajoutez un compte et attribuez-lui un rôle en quelques secondes.</p>
+            </div>
+          </div>
+
+          <div class="create-user-form">
+            <label class="form-field">
+              <span>Prénom</span>
+              <input
+                type="text"
+                [(ngModel)]="createUserFirstName"
+                class="filter-input"
+                placeholder="Prénom">
+            </label>
+            <label class="form-field">
+              <span>Nom</span>
+              <input
+                type="text"
+                [(ngModel)]="createUserLastName"
+                class="filter-input"
+                placeholder="Nom">
+            </label>
+            <label class="form-field form-field--full">
+              <span>E-mail</span>
+              <input
+                type="email"
+                [(ngModel)]="createUserEmail"
+                class="filter-input"
+                placeholder="exemple@domaine.com">
+            </label>
+            <label class="form-field">
+              <span>Mot de passe</span>
+              <input
+                type="password"
+                [(ngModel)]="createUserPassword"
+                class="filter-input"
+                placeholder="••••••••">
+            </label>
+            <label class="form-field">
+              <span>Rôle</span>
+              <select [(ngModel)]="createUserRole" class="filter-input">
+                @for (opt of roleOptions; track opt.value) {
+                  <option [value]="opt.value">{{ opt.label }}</option>
+                }
+              </select>
+            </label>
+            <div class="form-actions">
+              <button type="button" class="btn-primary" (click)="createUser()" [disabled]="createUserBusy()">
+                Créer
+              </button>
+            </div>
           </div>
         </div>
 
@@ -1150,6 +1220,26 @@
           </div>
         }
       </section>
+
+      @if (documentToDelete(); as deletedDoc) {
+        <div class="modal-overlay" (click)="closeDeleteDocumentModal()">
+          <div class="modal-content" (click)="$event.stopPropagation()">
+            <h3>Confirmer la suppression</h3>
+            <p>Supprimer définitivement <strong>{{ deletedDoc.title }}</strong> ?</p>
+            <p class="modal-note">Cette action efface le fichier et les signatures associées.</p>
+            <div class="modal-actions">
+              <button type="button" class="btn-outline" (click)="closeDeleteDocumentModal()">Annuler</button>
+              <button
+                type="button"
+                class="btn-danger"
+                (click)="deleteDocumentConfirmed()"
+                [disabled]="docActionBusyId() === deletedDoc.id">
+                Confirmer la suppression
+              </button>
+            </div>
+          </div>
+        </div>
+      }
 
     </main>
   </div>

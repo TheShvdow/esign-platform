@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  Post,
   Patch,
   Delete,
   Param,
@@ -23,6 +24,7 @@ import type { AuthenticatedRequest } from '../types/request.types';
 import { AdminService } from '../services/admin.service';
 import {
   AdminAuditListResponseDto,
+  AdminCreateUserDto,
   AdminDocumentsListResponseDto,
   AdminStatsDto,
   AdminUpdateUserDto,
@@ -96,6 +98,15 @@ export class AdminController {
     @Query() query: AdminUsersQueryDto,
   ): Promise<AdminUsersListResponseDto> {
     return this.adminService.listUsers(query);
+  }
+
+  @Post('users')
+  @ApiOperation({ summary: 'Créer un nouvel utilisateur' })
+  async createUser(
+    @Body() dto: AdminCreateUserDto,
+    @Request() req: AuthenticatedRequest,
+  ): Promise<AdminUserRowDto> {
+    return this.adminService.createUser(dto, req.user);
   }
 
   @Patch('users/:id')

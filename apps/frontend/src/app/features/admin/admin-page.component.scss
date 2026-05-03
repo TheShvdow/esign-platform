@@ -432,6 +432,9 @@
    Design tokens
 ───────────────────────────────────────────────────────────── */
 :host {
+  display: block;
+  height: 100vh;
+  overflow: hidden;
   --sidebar-w: 240px;
   --topbar-h: 56px;
   --accent: #0d9488;
@@ -489,6 +492,7 @@
   background: var(--surface-raised);
   font-family: var(--font-body);
   overflow: hidden;
+  overflow-x: hidden;
 }
 
 /* ─────────────────────────────────────────────────────────────
@@ -768,6 +772,7 @@
   flex-direction: column;
   min-width: 0;
   overflow: hidden;
+  overflow-x: auto;
 }
 
 /* Topbar */
@@ -912,7 +917,9 @@
 ───────────────────────────────────────────────────────────── */
 .main-content {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 24px;
 }
 
@@ -1239,6 +1246,8 @@
   padding: 16px;
   margin-bottom: 16px;
   box-shadow: var(--shadow-sm);
+  min-width: 0;
+  width: 100%;
 }
 
 .filter-field {
@@ -1250,10 +1259,11 @@
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--ink-soft);
+  min-width: 0;
 }
 
 .filter-input {
-  min-width: 140px;
+  min-width: 0;
   padding: 7px 10px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-md);
@@ -1272,6 +1282,28 @@
   &--wide {
     min-width: min(100%, 260px);
   }
+}
+
+.btn-primary {
+  background: linear-gradient(180deg, var(--accent) 0%, var(--accent-hover) 100%);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  font-weight: 600;
+  font-family: var(--font-display);
+  box-shadow: 0 4px 12px var(--accent-glow);
+  transition: transform 0.15s var(--ease-out), background 0.15s var(--ease-out);
+}
+
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.btn-primary:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
 }
 
 .btn-apply {
@@ -1294,6 +1326,119 @@
 
   &:active {
     transform: scale(0.98);
+  }
+}
+
+.create-user-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: var(--shadow-sm);
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.create-user-card .card-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+.create-user-card h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: var(--ink);
+}
+
+.create-user-card .card-sub {
+  margin: 0.35rem 0 0;
+  color: var(--ink-muted);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.create-user-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  min-width: 0;
+  width: 100%;
+}
+
+.create-user-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: var(--shadow-sm);
+  max-width: 100%;
+  overflow: hidden;
+  width: 100%;
+}
+
+.create-user-card .form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+  min-width: 0;
+}
+
+.create-user-card .form-field span {
+  color: var(--ink-soft);
+}
+
+.create-user-card .form-field--full {
+  grid-column: 1 / -1;
+}
+
+.create-user-card .filter-input {
+  width: 100%;
+  min-width: 0;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  color: var(--ink);
+}
+
+.create-user-card .filter-input:focus,
+.create-user-card .filter-input:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.12);
+}
+
+.form-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.create-user-card .btn-primary {
+  min-width: 140px;
+}
+
+@media (max-width: 760px) {
+  .create-user-form {
+    grid-template-columns: 1fr;
+  }
+
+  .form-actions {
+    justify-content: stretch;
+  }
+
+  .create-user-card .btn-primary {
+    width: 100%;
   }
 }
 
@@ -1445,6 +1590,66 @@
     opacity: 0.4;
     cursor: not-allowed;
   }
+}
+
+.create-user-panel {
+  margin: 1rem 0 1.5rem;
+  padding: 1.2rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.panel-row {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 1rem;
+}
+
+.filter-field--wide {
+  grid-column: span 2;
+}
+
+.actions-row {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 30;
+}
+
+.modal-content {
+  width: min(520px, calc(100% - 2rem));
+  padding: 1.5rem;
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  box-shadow: var(--shadow-2xl);
+  color: var(--ink);
+}
+
+.modal-content h3 {
+  margin: 0 0 0.75rem;
+  font-size: 1.1rem;
+}
+
+.modal-note {
+  margin: 0.75rem 0 1.25rem;
+  color: var(--ink-muted);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
 }
 
 /* ─────────────────────────────────────────────────────────────

@@ -367,12 +367,13 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { CommonModule, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { AdminApiService } from '../../core/services/admin-api.service';
 import { DocumentService } from '../../core/services/document.service';
 import {
   AdminAuditEntry,
+  AdminCreateUserPayload,
   AdminDailyCount,
   AdminPlatformStats,
   AdminUserRow,
@@ -394,6 +395,7 @@ export class AdminPageComponent implements OnInit {
   private readonly adminApi = inject(AdminApiService);
   private readonly documentService = inject(DocumentService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   // ── UI state ──────────────────────────────────────────────
   readonly activeSection = signal<SectionId>('insights');
@@ -411,7 +413,16 @@ export class AdminPageComponent implements OnInit {
   readonly usersLoading = signal(false);
   readonly patchBusyId = signal<string | null>(null);
   readonly ownerOptions = signal<AdminUserRow[]>([]);
+  createUserEmail = '';
+  createUserFirstName = '';
+  createUserLastName = '';
+  createUserPassword = '';
+  createUserRole = 'USER';
+  readonly createUserBusy = signal(false);
+  readonly createUserError = signal<string | null>(null);
+  readonly createUserSuccess = signal<string | null>(null);
 
+  readonly documentToDelete = signal<DocumentDto | null>(null);
   // ── Documents ─────────────────────────────────────────────
   readonly documents = signal<DocumentDto[]>([]);
   readonly documentsTotal = signal(0);
@@ -534,16 +545,35 @@ export class AdminPageComponent implements OnInit {
 
   // ── Lifecycle ─────────────────────────────────────────────
   ngOnInit(): void {
+    this.route.paramMap.subscribe((params) => {
+      const rawSection = params.get('section');
+      const section: SectionId =
+        rawSection === 'user' || rawSection === 'users'
+          ? 'users'
+          : rawSection === 'document' || rawSection === 'documents'
+          ? 'documents'
+          : rawSection === 'audit'
+          ? 'audit'
+          : 'insights';
+
+      this.activeSection.set(section);
+    });
+
     this.refreshAll();
     this.loadOwnerDirectory();
   }
 
-  // ── Sidebar ───────────────────────────────────────────────
+  // ── Sidebar ─────────────────────────────────────────────────
   toggleSidebar(): void {
     this.sidebarCollapsed.update((v) => !v);
   }
 
   setSection(section: SectionId): void {
+    if (section === 'insights') {
+      void this.router.navigate(['/admin']);
+    } else {
+      void this.router.navigate(['/admin', section]);
+    }
     this.activeSection.set(section);
   }
 
@@ -678,6 +708,79 @@ export class AdminPageComponent implements OnInit {
           this.loadOwnerDirectory();
         },
         error: () => this.applyUserFilters(this.usersPage()),
+      });
+  }
+
+  createUser(): void {
+    if (this.createUserBusy()) return;
+
+    this.createUserError.set(null);
+    this.createUserSuccess.set(null);
+    this.createUserBusy.set(true);
+
+    const payload: AdminCreateUserPayload = {
+      email: this.createUserEmail.trim(),
+      firstName: this.createUserFirstName.trim(),
+      lastName: this.createUserLastName.trim(),
+      password: this.createUserPassword,
+      role: this.createUserRole || 'USER',
+    };
+
+    this.adminApi
+      .createUser(payload)
+      .pipe(finalize(() => this.createUserBusy.set(false)))
+      .subscribe({
+        next: (created) => {
+          this.createUserSuccess.set(
+            `Utilisateur ${created.firstName} ${created.lastName} créé avec succès.`,
+          );
+          this.createUserEmail = '';
+          this.createUserFirstName = '';
+          this.createUserLastName = '';
+          this.createUserPassword = '';
+          this.createUserRole = 'USER';
+          this.applyUserFilters(1);
+          this.loadOwnerDirectory();
+        },
+        error: (err) => {
+          this.createUserError.set(
+            err?.error?.message ?? 'Impossible de créer l’utilisateur.',
+          );
+        },
+      });
+  }
+
+  openDeleteDocumentModal(doc: DocumentDto): void {
+    this.documentToDelete.set(doc);
+  }
+
+  closeDeleteDocumentModal(): void {
+    this.documentToDelete.set(null);
+  }
+
+  deleteDocumentConfirmed(): void {
+    const doc = this.documentToDelete();
+    if (!doc) return;
+
+    this.docActionBusyId.set(doc.id);
+    this.docActionError.set(null);
+
+    this.adminApi
+      .deleteDocument(doc.id)
+      .pipe(finalize(() => {
+        this.docActionBusyId.set(null);
+        this.documentToDelete.set(null);
+      }))
+      .subscribe({
+        next: () => {
+          this.applyDocFilters(this.documentsPage());
+          this.loadStats();
+        },
+        error: (err) => {
+          this.docActionError.set(
+            err?.error?.message ?? 'Suppression impossible.',
+          );
+        },
       });
   }
 

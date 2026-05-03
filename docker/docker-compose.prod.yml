@@ -1,15 +1,13 @@
-version: '3.8'
-
 services:
   backend:
     build:
-      context: .
+      context: ..
       dockerfile: docker/backend.Dockerfile
       target: production
     environment:
       - NODE_ENV=production
     env_file:
-      - apps/backend/.env.production
+      - ../apps/backend/.env.production
     restart: unless-stopped
     networks:
       - esign-network
@@ -21,12 +19,11 @@ services:
 
   frontend:
     build:
-      context: .
+      context: ..
       dockerfile: docker/frontend.Dockerfile
       target: production
     environment:
       - NODE_ENV=production
-      - NEXT_PUBLIC_API_URL=https://api.esign.company.com
     restart: unless-stopped
     networks:
       - esign-network
@@ -36,7 +33,6 @@ services:
       - "traefik.http.routers.frontend.tls=true"
       - "traefik.http.routers.frontend.tls.certresolver=letsencrypt"
 
-  # Reverse Proxy
   traefik:
     image: traefik:v3.0
     command:
@@ -52,10 +48,10 @@ services:
       - "443:443"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./acme.json:/acme.json
+      - ../acme.json:/acme.json
     networks:
       - esign-network
 
 networks:
   esign-network:
-    external: true
+    driver: bridge

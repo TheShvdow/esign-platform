@@ -44,6 +44,14 @@ export interface AdminUsersResponse {
   limit: number;
 }
 
+export interface AdminCreateUserPayload {
+  email: string;
+  firstName: string;
+  lastName: string;
+  password: string;
+  role?: string;
+}
+
 export interface AdminAuditEntry {
   id: string;
   action: string;
