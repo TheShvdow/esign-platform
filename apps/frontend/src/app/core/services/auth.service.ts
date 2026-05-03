@@ -2,7 +2,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { AuthResponse, LoginPayload, User } from '../models/auth.models';
+import { AuthResponse, LoginPayload, RegisterPayload, User } from '../models/auth.models';
 
 const ACCESS_TOKEN_KEY = 'esign.accessToken';
 const USER_KEY = 'esign.user';
@@ -25,6 +25,12 @@ export class AuthService {
   login(payload: LoginPayload): Observable<AuthResponse> {
     return this.http
       .post<AuthResponse>(`${this.apiBaseUrl}/auth/login`, payload)
+      .pipe(tap((response) => this.persistSession(response)));
+  }
+
+  register(payload: RegisterPayload): Observable<AuthResponse> {
+    return this.http
+      .post<AuthResponse>(`${this.apiBaseUrl}/auth/register`, payload)
       .pipe(tap((response) => this.persistSession(response)));
   }
 

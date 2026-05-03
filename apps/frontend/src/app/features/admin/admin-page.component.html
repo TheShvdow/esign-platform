@@ -1,4 +1,4 @@
-<div class="admin-shell">
+<!-- <div class="admin-shell">
   <header class="admin-topbar">
     <div class="admin-topbar__brand">
       <a routerLink="/documents" class="admin-back">Documents</a>
@@ -459,4 +459,698 @@
       }
     }
   </section>
+</div> -->
+
+<div class="admin-shell" [class.sidebar-collapsed]="sidebarCollapsed()">
+
+  <!-- ═══════════ SIDEBAR ═══════════ -->
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <div class="sidebar-brand">
+        <div class="brand-logo">
+          <div class="brand-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+          </div>
+          <div class="brand-text">
+            <span class="brand-name">eSign</span>
+            <span class="brand-sub">Pilotage</span>
+          </div>
+        </div>
+        <button class="sidebar-toggle" (click)="toggleSidebar()" type="button" aria-label="Réduire le menu">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M15 18l-6-6 6-6"/>
+          </svg>
+        </button>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-group">
+          <span class="nav-group-label">Vue d'ensemble</span>
+          <a class="nav-item" [class.active]="activeSection() === 'insights'" (click)="setSection('insights')" href="#insights">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <rect x="3" y="3" width="7" height="7" rx="1.5"/>
+              <rect x="14" y="3" width="7" height="7" rx="1.5"/>
+              <rect x="3" y="14" width="7" height="7" rx="1.5"/>
+              <rect x="14" y="14" width="7" height="7" rx="1.5"/>
+            </svg>
+            <span class="nav-label">Tableau de bord</span>
+          </a>
+        </div>
+
+        <div class="nav-group">
+          <span class="nav-group-label">Gestion</span>
+          <a class="nav-item" [class.active]="activeSection() === 'users'" (click)="setSection('users')" href="#users">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
+            </svg>
+            <span class="nav-label">Utilisateurs</span>
+            @if (stats(); as s) {
+              <span class="nav-badge">{{ s.users.total }}</span>
+            }
+          </a>
+          <a class="nav-item" [class.active]="activeSection() === 'documents'" (click)="setSection('documents')" href="#documents">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+              <polyline points="14,2 14,8 20,8"/>
+              <line x1="16" y1="13" x2="8" y2="13"/>
+              <line x1="16" y1="17" x2="8" y2="17"/>
+            </svg>
+            <span class="nav-label">Documents</span>
+            @if (stats(); as s) {
+              <span class="nav-badge">{{ s.documents.total }}</span>
+            }
+          </a>
+          <a class="nav-item" [class.active]="activeSection() === 'audit'" (click)="setSection('audit')" href="#audit">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
+              <rect x="9" y="3" width="6" height="4" rx="1"/>
+              <line x1="9" y1="12" x2="15" y2="12"/>
+              <line x1="9" y1="16" x2="13" y2="16"/>
+            </svg>
+            <span class="nav-label">Journal d'audit</span>
+          </a>
+        </div>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="user-row">
+          <div class="user-avatar">AS</div>
+          <div class="user-info">
+            <span class="user-name">Admin Sys</span>
+            <span class="user-role">Administrateur</span>
+          </div>
+        </div>
+        <a routerLink="/documents" class="back-link">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M19 12H5M12 19l-7-7 7-7"/>
+          </svg>
+          <span>Documents</span>
+        </a>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ═══════════ MAIN ═══════════ -->
+  <div class="main-area">
+
+    <!-- Top bar -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="mobile-toggle" (click)="toggleSidebar()" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="3" y1="6" x2="21" y2="6"/>
+            <line x1="3" y1="12" x2="21" y2="12"/>
+            <line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+        </button>
+        <div class="topbar-breadcrumb">
+          <span class="breadcrumb-root">Administration</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+          <span class="breadcrumb-current">{{ sectionLabel() }}</span>
+        </div>
+      </div>
+      <div class="topbar-right">
+        @if (statsError()) {
+          <span class="topbar-error">{{ statsError() }}</span>
+        }
+        <button
+          type="button"
+          class="btn-refresh"
+          (click)="refreshAll()"
+          [disabled]="usersLoading()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M23 4v6h-6M1 20v-6h6"/>
+            <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+          </svg>
+          Actualiser
+        </button>
+      </div>
+    </header>
+
+    <!-- Error banners -->
+    @if (docActionError()) {
+      <div class="banner banner--error">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        {{ docActionError() }}
+      </div>
+    }
+
+    <main class="main-content">
+
+      <!-- ─── SECTION: INSIGHTS ─── -->
+      <section id="insights" class="section" [class.section--active]="activeSection() === 'insights'">
+
+        @if (stats(); as s) {
+          <!-- KPI Grid -->
+          <div class="kpi-grid">
+            <article class="kpi-card kpi-card--teal">
+              <div class="kpi-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+              </div>
+              <div class="kpi-body">
+                <span class="kpi-label">Utilisateurs</span>
+                <strong class="kpi-value">{{ s.users.total | number }}</strong>
+                <span class="kpi-hint">{{ s.users.active }} actifs</span>
+              </div>
+            </article>
+
+            <article class="kpi-card kpi-card--indigo">
+              <div class="kpi-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
+              </div>
+              <div class="kpi-body">
+                <span class="kpi-label">Documents</span>
+                <strong class="kpi-value">{{ s.documents.total | number }}</strong>
+                <span class="kpi-hint">{{ formatBytes(s.documents.totalBytesStored) }} stockés</span>
+              </div>
+            </article>
+
+            <article class="kpi-card kpi-card--emerald">
+              <div class="kpi-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              </div>
+              <div class="kpi-body">
+                <span class="kpi-label">Signatures</span>
+                <strong class="kpi-value">{{ s.signatures.total | number }}</strong>
+                <span class="kpi-hint">cumulées</span>
+              </div>
+            </article>
+
+            <article class="kpi-card kpi-card--amber">
+              <div class="kpi-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/></svg>
+              </div>
+              <div class="kpi-body">
+                <span class="kpi-label">Audit (7 j.)</span>
+                <strong class="kpi-value">{{ s.audit.entriesLast7Days | number }}</strong>
+                <span class="kpi-hint">{{ s.audit.totalEntries | number }} entrées totales</span>
+              </div>
+            </article>
+          </div>
+
+          <!-- Charts Row -->
+          <div class="charts-grid">
+            <!-- Main Chart -->
+            <div class="chart-card chart-card--main">
+              <div class="chart-card-header">
+                <div>
+                  <h3 class="chart-card-title">Activité quotidienne</h3>
+                  <p class="chart-card-sub">{{ s.trends.trendDays }} derniers jours</p>
+                </div>
+                <div class="chart-tabs">
+                  <button
+                    class="chart-tab"
+                    [class.active]="activeChart() === 'docs'"
+                    (click)="setActiveChart('docs')"
+                    type="button">Docs</button>
+                  <button
+                    class="chart-tab"
+                    [class.active]="activeChart() === 'users'"
+                    (click)="setActiveChart('users')"
+                    type="button">Comptes</button>
+                  <button
+                    class="chart-tab"
+                    [class.active]="activeChart() === 'sigs'"
+                    (click)="setActiveChart('sigs')"
+                    type="button">Signatures</button>
+                </div>
+              </div>
+              @if (chartLabels().length) {
+                <app-admin-chart
+                  [chartTitle]="activeChartTitle()"
+                  [labels]="chartLabels()"
+                  [values]="activeChartValues()"
+                  [variant]="activeChart() === 'docs' ? 'bar' : 'line'"
+                  [color]="activeChartColor()">
+                </app-admin-chart>
+              } @else {
+                <p class="muted">Pas encore de données.</p>
+              }
+            </div>
+
+            <!-- Donut: statuts -->
+            <div class="chart-card chart-card--side">
+              <div class="chart-card-header">
+                <h3 class="chart-card-title">Statuts</h3>
+                <p class="chart-card-sub">Documents</p>
+              </div>
+              <div class="breakdown-list">
+                @for (st of docStatusKeys; track st) {
+                  @if (s.documents.byStatus[st]) {
+                    <div class="breakdown-item">
+                      <span class="breakdown-dot" [style.background]="docStatusColor(st)"></span>
+                      <span class="breakdown-name">{{ docStatusLabel(st) }}</span>
+                      <strong class="breakdown-value">{{ s.documents.byStatus[st] }}</strong>
+                    </div>
+                  }
+                }
+              </div>
+            </div>
+          </div>
+
+          <!-- Mini charts row -->
+          <div class="mini-charts-grid">
+            <div class="chart-card">
+              <div class="chart-card-header">
+                <h3 class="chart-card-title">Documents / jour</h3>
+              </div>
+              @if (chartLabels().length) {
+                <app-admin-chart
+                  chartTitle="Documents"
+                  [labels]="chartLabels()"
+                  [values]="chartDocs()"
+                  variant="bar"
+                  color="#0d9488">
+                </app-admin-chart>
+              }
+            </div>
+            <div class="chart-card">
+              <div class="chart-card-header">
+                <h3 class="chart-card-title">Nouveaux comptes / jour</h3>
+              </div>
+              @if (chartLabels().length) {
+                <app-admin-chart
+                  chartTitle="Utilisateurs"
+                  [labels]="chartLabels()"
+                  [values]="chartUsers()"
+                  variant="line"
+                  color="#6366f1">
+                </app-admin-chart>
+              }
+            </div>
+            <div class="chart-card">
+              <div class="chart-card-header">
+                <h3 class="chart-card-title">Signatures / jour</h3>
+              </div>
+              @if (chartLabels().length) {
+                <app-admin-chart
+                  chartTitle="Signatures"
+                  [labels]="chartLabels()"
+                  [values]="chartSigs()"
+                  variant="line"
+                  color="#059669">
+                </app-admin-chart>
+              }
+            </div>
+          </div>
+
+          <!-- Breakdown -->
+          <div class="breakdown-grid">
+            <div class="breakdown-card">
+              <h3 class="breakdown-card-title">Rôles utilisateurs</h3>
+              <ul class="breakdown-list-ul">
+                @for (opt of roleOptions; track opt.value) {
+                  @if (s.users.byRole[opt.value]) {
+                    <li>
+                      <span class="role-pill" [class]="'role-pill--' + opt.value.toLowerCase()">{{ opt.label }}</span>
+                      <strong>{{ s.users.byRole[opt.value] }}</strong>
+                    </li>
+                  }
+                }
+              </ul>
+            </div>
+            <div class="breakdown-card">
+              <h3 class="breakdown-card-title">Stockage par statut</h3>
+              <ul class="breakdown-list-ul">
+                @for (st of docStatusKeys; track st) {
+                  @if (s.documents.byStatus[st]) {
+                    <li>
+                      <span class="status-pill" [class]="'status-pill--' + st.toLowerCase()">{{ docStatusLabel(st) }}</span>
+                      <strong>{{ s.documents.byStatus[st] }}</strong>
+                    </li>
+                  }
+                }
+              </ul>
+            </div>
+          </div>
+
+        } @else if (!statsError()) {
+          <div class="skeleton-grid">
+            @for (i of [1,2,3,4]; track i) {
+              <div class="skeleton-kpi"></div>
+            }
+          </div>
+        }
+      </section>
+
+      <!-- ─── SECTION: USERS ─── -->
+      <section id="users" class="section" [class.section--active]="activeSection() === 'users'">
+        <div class="section-head">
+          <div>
+            <h2 class="section-title">Utilisateurs &amp; privilèges</h2>
+            <p class="section-sub">Gérez les rôles et statuts de chaque compte.</p>
+          </div>
+        </div>
+
+        <div class="filters-bar">
+          <label class="filter-field">
+            <span>Recherche</span>
+            <input
+              type="search"
+              [(ngModel)]="userFilterQ"
+              (keyup.enter)="applyUserFilters(1)"
+              placeholder="E-mail, prénom, nom…"
+              class="filter-input">
+          </label>
+          <label class="filter-field">
+            <span>Rôle</span>
+            <select [(ngModel)]="userFilterRole" class="filter-input">
+              <option value="">Tous</option>
+              @for (opt of roleOptions; track opt.value) {
+                <option [value]="opt.value">{{ opt.label }}</option>
+              }
+            </select>
+          </label>
+          <button type="button" class="btn-apply" (click)="applyUserFilters(1)">Appliquer</button>
+        </div>
+
+        @if (usersLoading()) {
+          <div class="loading-state">
+            <div class="spinner"></div>
+            <span>Chargement…</span>
+          </div>
+        } @else {
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Utilisateur</th>
+                  <th>Rôle</th>
+                  <th>Statut</th>
+                  <th>2FA</th>
+                  <th>Créé le</th>
+                  <th>Dernière connexion</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (u of users(); track u.id) {
+                  <tr [class.row--busy]="patchBusyId() === u.id">
+                    <td>
+                      <div class="cell-user">
+                        <div class="user-avatar-sm">{{ u.firstName[0] }}{{ u.lastName[0] }}</div>
+                        <div>
+                          <strong>{{ u.firstName }} {{ u.lastName }}</strong>
+                          <span class="cell-email">{{ u.email }}</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <select
+                        class="inline-select"
+                        [ngModel]="u.role"
+                        (ngModelChange)="onRoleChange(u, $event)"
+                        [disabled]="patchBusyId() === u.id">
+                        @for (opt of roleOptions; track opt.value) {
+                          <option [value]="opt.value">{{ opt.label }}</option>
+                        }
+                      </select>
+                    </td>
+                    <td>
+                      <label class="toggle-wrap">
+                        <input
+                          type="checkbox"
+                          [checked]="u.isActive"
+                          (change)="onActiveToggle(u, $any($event.target).checked)"
+                          [disabled]="patchBusyId() === u.id">
+                        <span class="toggle-track">
+                          <span class="toggle-thumb"></span>
+                        </span>
+                        <span class="sr-only">Compte actif</span>
+                      </label>
+                    </td>
+                    <td>
+                      <span class="badge-bool" [class.badge-bool--on]="u.mfaEnabled">
+                        {{ u.mfaEnabled ? 'Actif' : '—' }}
+                      </span>
+                    </td>
+                    <td>{{ formatDate(u.createdAt) }}</td>
+                    <td>{{ u.lastLoginAt ? formatDate(u.lastLoginAt) : '—' }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          <div class="pager-row">
+            <span class="pager-info">{{ usersTotal() }} utilisateur(s)</span>
+            @if (usersTotal() > 15) {
+              <div class="pager">
+                <button
+                  type="button"
+                  class="pager-btn"
+                  [disabled]="usersPage() <= 1"
+                  (click)="applyUserFilters(usersPage() - 1)">
+                  Précédent
+                </button>
+                <span class="pager-page">{{ usersPage() }}</span>
+                <button
+                  type="button"
+                  class="pager-btn"
+                  [disabled]="usersPage() * 15 >= usersTotal()"
+                  (click)="applyUserFilters(usersPage() + 1)">
+                  Suivant
+                </button>
+              </div>
+            }
+          </div>
+        }
+      </section>
+
+      <!-- ─── SECTION: DOCUMENTS ─── -->
+      <section id="documents" class="section" [class.section--active]="activeSection() === 'documents'">
+        <div class="section-head">
+          <div>
+            <h2 class="section-title">Documents</h2>
+            <p class="section-sub">Filtres avancés, tri et gestion du cycle de vie.</p>
+          </div>
+        </div>
+
+        <div class="filters-bar filters-bar--wrap">
+          <label class="filter-field">
+            <span>Titre</span>
+            <input type="search" [(ngModel)]="docFilterQ" class="filter-input" placeholder="Contient…">
+          </label>
+          <label class="filter-field">
+            <span>Statut</span>
+            <select [(ngModel)]="docFilterStatus" class="filter-input">
+              @for (opt of docStatusOptions; track opt.value) {
+                <option [value]="opt.value">{{ opt.label }}</option>
+              }
+            </select>
+          </label>
+          <label class="filter-field">
+            <span>Propriétaire</span>
+            <select [(ngModel)]="docFilterOwnerId" class="filter-input filter-input--wide">
+              <option value="">Tous</option>
+              @for (o of ownerOptions(); track o.id) {
+                <option [value]="o.id">{{ o.firstName }} {{ o.lastName }} — {{ o.email }}</option>
+              }
+            </select>
+          </label>
+          <label class="filter-field">
+            <span>Du</span>
+            <input type="date" [(ngModel)]="docFilterDateFrom" class="filter-input">
+          </label>
+          <label class="filter-field">
+            <span>Au</span>
+            <input type="date" [(ngModel)]="docFilterDateTo" class="filter-input">
+          </label>
+          <label class="filter-field">
+            <span>Tri</span>
+            <select [(ngModel)]="docSortBy" class="filter-input">
+              <option value="createdAt">Date</option>
+              <option value="title">Titre</option>
+              <option value="fileSize">Taille</option>
+            </select>
+          </label>
+          <label class="filter-field">
+            <span>Ordre</span>
+            <select [(ngModel)]="docSortOrder" class="filter-input">
+              <option value="DESC">Décroissant</option>
+              <option value="ASC">Croissant</option>
+            </select>
+          </label>
+          <button type="button" class="btn-apply" (click)="applyDocFilters(1)">Appliquer</button>
+        </div>
+
+        @if (documentsLoading()) {
+          <div class="loading-state">
+            <div class="spinner"></div>
+            <span>Chargement…</span>
+          </div>
+        } @else if (documents().length === 0) {
+          <div class="empty-state">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
+            <p>Aucun document pour ces critères.</p>
+          </div>
+        } @else {
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Titre</th>
+                  <th>Statut</th>
+                  <th>Propriétaire</th>
+                  <th>Taille</th>
+                  <th>Signatures</th>
+                  <th class="col-actions">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (d of documents(); track d.id) {
+                  <tr [class.row--busy]="docActionBusyId() === d.id">
+                    <td><strong class="doc-title">{{ d.title }}</strong></td>
+                    <td>
+                      <select
+                        class="inline-select"
+                        [ngModel]="d.status"
+                        (ngModelChange)="onDocumentStatusChange(d, $event)"
+                        [disabled]="docActionBusyId() === d.id">
+                        @for (opt of docStatusOptions; track opt.value) {
+                          @if (opt.value) {
+                            <option [value]="opt.value">{{ opt.label }}</option>
+                          }
+                        }
+                      </select>
+                    </td>
+                    <td>{{ d.owner.firstName }} {{ d.owner.lastName }}</td>
+                    <td class="cell-mono">{{ formatBytes(d.fileSize) }}</td>
+                    <td>
+                      <span class="sig-count">{{ d.signatures.length }}</span>
+                    </td>
+                    <td class="col-actions">
+                      <div class="action-group">
+                        <button type="button" class="btn-action" (click)="openDocument(d.id)">Voir</button>
+                        <button type="button" class="btn-action" (click)="downloadDocument(d)">Télécharger</button>
+                        <button
+                          type="button"
+                          class="btn-action btn-action--danger"
+                          (click)="confirmDeleteDocument(d)"
+                          [disabled]="docActionBusyId() === d.id">
+                          Supprimer
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          <div class="pager-row">
+            <span class="pager-info">{{ documentsTotal() }} document(s)</span>
+            @if (documentsTotal() > 15) {
+              <div class="pager">
+                <button
+                  type="button"
+                  class="pager-btn"
+                  [disabled]="documentsPage() <= 1"
+                  (click)="applyDocFilters(documentsPage() - 1)">
+                  Précédent
+                </button>
+                <span class="pager-page">{{ documentsPage() }}</span>
+                <button
+                  type="button"
+                  class="pager-btn"
+                  [disabled]="documentsPage() * 15 >= documentsTotal()"
+                  (click)="applyDocFilters(documentsPage() + 1)">
+                  Suivant
+                </button>
+              </div>
+            }
+          </div>
+        }
+      </section>
+
+      <!-- ─── SECTION: AUDIT ─── -->
+      <section id="audit" class="section" [class.section--active]="activeSection() === 'audit'">
+        <div class="section-head">
+          <div>
+            <h2 class="section-title">Journal d'audit</h2>
+            <p class="section-sub">Traçabilité complète de toutes les actions.</p>
+          </div>
+        </div>
+
+        <div class="filters-bar filters-bar--wrap">
+          <label class="filter-field">
+            <span>Action</span>
+            <select [(ngModel)]="auditFilterAction" class="filter-input filter-input--wide">
+              @for (opt of auditActionOptions; track opt.value) {
+                <option [value]="opt.value">{{ opt.label }}</option>
+              }
+            </select>
+          </label>
+          <label class="filter-field">
+            <span>User ID</span>
+            <input type="text" [(ngModel)]="auditFilterUserId" class="filter-input" placeholder="UUID">
+          </label>
+          <label class="filter-field">
+            <span>Du</span>
+            <input type="date" [(ngModel)]="auditFilterDateFrom" class="filter-input">
+          </label>
+          <label class="filter-field">
+            <span>Au</span>
+            <input type="date" [(ngModel)]="auditFilterDateTo" class="filter-input">
+          </label>
+          <button type="button" class="btn-apply" (click)="applyAuditFilters(1)">Appliquer</button>
+        </div>
+
+        @if (auditLoading()) {
+          <div class="loading-state">
+            <div class="spinner"></div>
+            <span>Chargement…</span>
+          </div>
+        } @else {
+          <div class="audit-timeline">
+            @for (a of auditItems(); track a.id) {
+              <div class="audit-entry">
+                <div class="audit-dot" [style.background]="auditActionColor(a.action)"></div>
+                <div class="audit-line"></div>
+                <div class="audit-body">
+                  <div class="audit-row-top">
+                    <span class="audit-action">{{ auditActionLabel(a.action) }}</span>
+                    <time class="audit-time">{{ formatDate(a.createdAt) }}</time>
+                  </div>
+                  <div class="audit-meta">
+                    <span class="mono">{{ a.userId ?? '—' }}</span>
+                    @if (a.entityType) {
+                      <span class="audit-sep">·</span>
+                      <span>{{ a.entityType }}</span>
+                      <span class="mono audit-entity">{{ a.entityId }}</span>
+                    }
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+          <div class="pager-row">
+            <span class="pager-info">{{ auditTotal() }} entrée(s)</span>
+            @if (auditTotal() > 25) {
+              <div class="pager">
+                <button
+                  type="button"
+                  class="pager-btn"
+                  [disabled]="auditPage() <= 1"
+                  (click)="applyAuditFilters(auditPage() - 1)">
+                  Précédent
+                </button>
+                <span class="pager-page">{{ auditPage() }}</span>
+                <button
+                  type="button"
+                  class="pager-btn"
+                  [disabled]="auditPage() * 25 >= auditTotal()"
+                  (click)="applyAuditFilters(auditPage() + 1)">
+                  Suivant
+                </button>
+              </div>
+            }
+          </div>
+        }
+      </section>
+
+    </main>
+  </div>
 </div>
